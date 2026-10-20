@@ -536,6 +536,14 @@
   #giftScr.party #giftBub b{color:#ffe066}
   #vnChars{transition:bottom .4s steps(5)}
   html,body{height:100%;height:100dvh}
+  #travelBan{position:absolute;left:24px;right:24px;top:110px;z-index:5;padding:14px 12px;text-align:center;color:#fff;background:var(--purple);opacity:0;pointer-events:none;transform:translateY(-20px);
+             box-shadow:0 -4px 0 var(--purple),0 4px 0 var(--purple),-4px 0 0 var(--purple),4px 0 0 var(--purple),0 10px 0 rgba(0,0,0,.25);transition:opacity .3s steps(3),transform .3s steps(3)}
+  #travelBan small{display:block;font-family:'Galmuri9';font-size:11px;letter-spacing:2px;color:#ffe066}
+  #travelBan b{display:block;margin-top:6px;font-size:17px}
+  #mapScr.travel #travelBan{opacity:1;transform:none}
+  #mapScr.travel #mapHint{display:none}
+  #duo.walk img{animation:walkHop .28s steps(2) infinite}
+  @keyframes walkHop{50%{transform:translateY(-14px) rotate(4deg)}}
 </style>
 </head>
 <body>
@@ -586,7 +594,7 @@
       <div id="duo"><img src="assets/hero_m.png" alt=""><img src="assets/hero_w.png" alt=""></div></div></div>
     <div id="mapTop"><div><div class="st" id="mapStage">STAGE 1</div><h3 id="mapZone">온수리 존</h3></div>
       <div id="mapBtns"><button class="mbtn" id="btnBook">📖<small>문장</small></button><button class="mbtn" id="btnPuzzle">🧩<small>퍼즐</small></button></div></div>
-    <div id="mapHint">가고 싶은 곳을 눌러 봐!</div>
+    <div id="travelBan"></div><div id="mapHint">가고 싶은 곳을 눌러 봐!</div>
     <div id="zoneSheet"><div class="sh"><div><small id="zsStage"></small><b id="zsName"></b></div><button id="zsClose">전체 지도 ✕</button></div><div id="spotList"></div></div>
   </div>
 
@@ -662,7 +670,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgr4abq"></script>
+<script src="data.js?v=mvgr8y77"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -951,8 +959,34 @@ function renderMap(){
     m.onclick=e=>{ e.stopPropagation(); selectZone(z.id); };
     $('marks').appendChild(m);
   });
-  $('duo').style.left=(cz.mapPos[0]-190)+'px'; $('duo').style.top=(cz.mapPos[1]+30)+'px';
+  // 주인공 위치 — 새 존이 열렸으면 이전 존에서 걸어서 이동
+  const LZ='ganaland_zone_v1'; let last=null; try{ last=localStorage.getItem(LZ) }catch(e){}
+  const pz=ZONES.find(z=>z.id===last);
+  if(pz && ZONES.indexOf(pz)<ZONES.indexOf(cz) && !travelling) travel(pz,cz);
+  else if(!travelling){ $('duo').style.left=(cz.mapPos[0]-190)+'px'; $('duo').style.top=(cz.mapPos[1]+30)+'px'; }
+  try{ localStorage.setItem(LZ,cz.id) }catch(e){}
   if(selZone && VIS.some(z=>z.id===selZone)) selectZone(selZone,true); else closeZone();
+}
+const josaRo=w=>{ const c=w.charCodeAt(w.length-1); if(c<0xAC00||c>0xD7A3) return '로'; const j=(c-0xAC00)%28; return (j===0||j===8)?'로':'으로'; };
+let travelling=false;
+async function travel(from,to){
+  travelling=true; const D=$('duo');
+  D.style.transition='none'; D.style.left=(from.mapPos[0]-190)+'px'; D.style.top=(from.mapPos[1]+30)+'px'; void D.offsetWidth;
+  $('travelBan').innerHTML=`<small>${from.name} 클리어!</small><b>${to.final?'FINAL':'STAGE '+to.stage} · ${to.name}${josaRo(to.name)} 이동!</b>`;
+  $('mapScr').classList.add('travel');
+  await wait(900);
+  D.classList.add('walk'); D.style.transition='left 2.8s steps(28), top 2.8s steps(28)';
+  D.style.left=(to.mapPos[0]-190)+'px'; D.style.top=(to.mapPos[1]+30)+'px';
+  for(let k=0;k<14;k++){ // 반짝이 발자국
+    const r=D.getBoundingClientRect(), st=stage.getBoundingClientRect(), sc=st.width/390;
+    burst((r.left+r.width/2-st.left)/sc,(r.bottom-st.top)/sc,5,{speed:1.2,life:30});
+    if(k%2===0) beep([[440+k*20,.03]]); await wait(200); }
+  await wait(250);
+  D.classList.remove('walk'); D.style.transition='';
+  burst(195,420,40,{speed:4}); beep([[523,.07],[659,.07],[784,.07],[1047,.2]]);
+  $('travelBan').innerHTML=`<small>새로운 스테이지</small><b>${to.final?'FINAL':'STAGE '+to.stage} · ${to.name} 오픈!</b>`;
+  await wait(1800);
+  $('mapScr').classList.remove('travel'); travelling=false;
 }
 let selZone=null;
 function closeZone(){ selZone=null; $('mapScr').classList.remove('zone');
