@@ -529,6 +529,11 @@
   #spotScr.on #vnChars img.ch.dance:nth-child(3){animation-delay:.33s}
   @keyframes samba{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8px) rotate(3deg)}}
   #vnChoices .pbtn.mdone{color:#1f8a3e}
+  #giftScr.party .hb{animation:partyHop .4s steps(2) infinite}
+  #giftScr.party .hb+.hb{animation-delay:.2s}
+  @keyframes partyHop{50%{transform:translateY(-14px) rotate(4deg)}}
+  #giftScr.party #giftBub{opacity:1}
+  #giftScr.party #giftBub b{color:#ffe066}
 </style>
 </head>
 <body>
@@ -655,7 +660,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgqqf14"></script>
+<script src="data.js?v=mvgqtwya"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1224,6 +1229,7 @@ async function giftScene(sp,n){
   $('giftFloat').textContent=g.emoji||'';
   S.classList.add(g.effect||'tipsy');
   if(g.effect==='bless'){ beep([[1568,.08],[1319,.08],[1568,.2]]); for(let k=0;k<4;k++){ burst(195,430,22,{speed:3,life:50}); await wait(200); } }
+  if(g.effect==='party'){ beep([[523,.12],[523,.12],[587,.25],[523,.25],[698,.25],[659,.5]]); for(let k=0;k<6;k++){ burst(80+Math.random()*230,260,26,{up:true,speed:5,coin:k%3===0,life:70}); await wait(220); } }
   if(g.effect==='wish'){ beep([[659,.1],[784,.1],[988,.25]]); for(let k=0;k<5;k++){ burst(195,300-k*40,10,{speed:1.5,life:40}); await wait(220); } }
   await type($('giftMood'), g.mood || '가나·민수가 살짝 취했다~ 헤헤<br>기분이 아주 좋아졌다! ♪', 45);
   await wait(900);
