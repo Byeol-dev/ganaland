@@ -1,0 +1,1392 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>가나랜드 보물찾기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.3/dist/galmuri.css">
+<style>
+  :root{
+    --ink:#2b1a14; --purple:#4b1a8c; --gold:#f6b21c; --green:#1f8a3e;
+    --sky1:#7ec8f2; --blue:#2f7fe0; --blueD:#1c55a8; --orange:#f47a1f; --yellow:#ffd23f; --sky2:#b8e4fb; --cream:#fff8e6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#1b1030}
+  body{display:grid;place-items:center;font-family:'Galmuri11',monospace;color:var(--ink);overflow:hidden}
+  img,canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+
+  /* 390×844 게임 화면, 뷰포트에 맞춰 스케일 */
+  #stage{position:fixed;left:50%;top:50%;width:390px;height:844px;overflow:hidden;background:var(--sky1);transform-origin:center}
+
+  /* 배경: 픽셀 강화도 지도 */
+  #map{position:absolute;left:0;top:0;width:944px;height:996px;
+       background:url(assets/map.png) 0 0/944px 996px no-repeat;image-rendering:pixelated;
+       transform:translate(-470px,-150px);animation:pan 26s steps(130) infinite alternate}
+  @keyframes pan{from{transform:translate(-470px,-110px)}to{transform:translate(-520px,-190px)}}
+  #haze{position:absolute;inset:0;pointer-events:none;
+        background:linear-gradient(180deg,rgba(184,228,251,.92) 0,rgba(184,228,251,.55) 34%,rgba(184,228,251,0) 52%,rgba(255,248,230,0) 66%,rgba(255,248,230,.8) 86%,var(--cream) 100%)}
+
+  /* 보물 반짝이 핀 */
+  .spark{position:absolute;width:24px;height:24px;animation:twinkle 1.2s steps(2) infinite}
+  @keyframes twinkle{50%{opacity:.25;transform:scale(.75)}}
+
+  /* 구름 */
+  .cloud{position:absolute;animation:drift linear infinite}
+  @keyframes drift{from{transform:translateX(-140px)}to{transform:translateX(460px)}}
+
+  /* HUD */
+  #hud{position:absolute;left:16px;right:16px;top:18px;display:flex;justify-content:space-between;align-items:center;
+       font-family:'Galmuri9';font-size:14px;color:#fff;text-shadow:2px 0 var(--purple),-2px 0 var(--purple),0 2px var(--purple),0 -2px var(--purple);opacity:0}
+  #hud .row{display:flex;gap:6px;align-items:center}
+
+  /* 로고 */
+  #logo{position:absolute;left:50%;top:70px;width:344px;margin-left:-172px;opacity:0;
+        filter:drop-shadow(0 4px 0 rgba(75,26,140,.35))}
+  #logo.in{animation:drop .9s steps(9) forwards, float 2.4s steps(4) .9s infinite}
+  @keyframes drop{0%{opacity:1;transform:translateY(-320px)}60%{opacity:1;transform:translateY(12px)}80%{transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}
+  @keyframes float{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+
+  #title{position:absolute;left:0;right:0;top:286px;text-align:center;opacity:0}
+  #title .ko{display:inline-block;font-family:'Galmuri11';font-weight:700;font-size:26px;color:#fff;letter-spacing:1px;
+             text-shadow:3px 0 var(--purple),-3px 0 var(--purple),0 3px var(--purple),0 -3px var(--purple),3px 3px var(--purple),-3px 3px var(--purple),3px -3px var(--purple),-3px -3px var(--purple),0 6px rgba(43,26,20,.35)}
+  #title .en{margin-top:10px;font-family:'Galmuri9';font-size:12px;color:var(--purple);letter-spacing:3px}
+  #title.in{animation:pop .5s steps(5) forwards}
+  @keyframes pop{0%{opacity:1;transform:scale(.2)}70%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:scale(1)}}
+
+  /* 마스코트 */
+  #mascots{position:absolute;left:50%;bottom:136px;width:308px;margin-left:-154px;opacity:0}
+  #mascots.in{animation:rise .7s steps(7) forwards, hop 1.6s steps(2) .7s infinite}
+  @keyframes rise{from{opacity:1;transform:translateY(300px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes hop{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:1;transform:translateY(-6px)}}
+
+  /* 말풍선 */
+  #bubble{position:absolute;left:24px;right:24px;top:364px;min-height:52px;padding:12px 14px;background:#fff;color:var(--ink);
+          font-size:13px;line-height:1.55;opacity:0;
+          box-shadow:0 -4px 0 #fff,0 4px 0 #fff,-4px 0 0 #fff,4px 0 0 #fff,0 8px 0 rgba(43,26,20,.18)}
+  #bubble::after{content:"";position:absolute;left:96px;bottom:-14px;width:12px;height:12px;background:#fff;
+                 box-shadow:-6px -2px 0 #fff, -10px 4px 0 -2px #fff}
+  #bubble.in{opacity:1}
+  #bubble b{color:var(--purple)}
+
+  /* 시작 버튼 */
+  #start{position:absolute;left:50%;bottom:64px;width:260px;margin-left:-130px;height:60px;border:0;cursor:pointer;
+         font-family:'Galmuri11';font-weight:700;font-size:20px;color:#fff;background:var(--purple);opacity:0;
+         box-shadow:0 -4px 0 var(--purple),0 4px 0 var(--purple),-4px 0 0 var(--purple),4px 0 0 var(--purple),inset 0 -6px 0 #33106a,0 10px 0 rgba(43,26,20,.25)}
+  #start:active{transform:translateY(4px);box-shadow:0 -4px 0 var(--purple),0 4px 0 var(--purple),-4px 0 0 var(--purple),4px 0 0 var(--purple),inset 0 -2px 0 #33106a,0 6px 0 rgba(43,26,20,.25)}
+  #start .tri{display:inline-block;margin-left:10px;color:var(--gold)}
+  #start.in{opacity:1}
+  #tap{position:absolute;left:0;right:0;bottom:30px;text-align:center;font-family:'Galmuri9';font-size:12px;letter-spacing:3px;color:var(--purple);opacity:0}
+  #tap.in{animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}0%{opacity:1}}
+
+  /* 아이리스 전환 */
+  #iris{position:absolute;inset:0;z-index:25;background:#0d0820;pointer-events:none;
+        clip-path:circle(0px at 50% 50%);-webkit-mask:none}
+  #iris.open{animation:irisOpen 1s steps(10) forwards}
+  #iris.close{animation:irisClose .9s steps(9) forwards}
+  @keyframes irisOpen{from{clip-path:circle(150% at 50% 50%)}to{clip-path:circle(0 at 50% 50%)}}
+  @keyframes irisClose{from{clip-path:circle(0 at 50% 50%)}to{clip-path:circle(150% at 50% 50%)}}
+  /* 처음엔 덮여 있음 */
+  #iris{clip-path:circle(150% at 50% 50%)}
+
+  #next{position:absolute;inset:0;z-index:26;display:grid;place-items:center;text-align:center;color:#fff;opacity:0;pointer-events:none}
+  #next.in{opacity:1;transition:opacity .4s steps(4) .2s}
+  #heroes{position:relative;width:300px;height:244px;margin:18px auto 14px}
+  .hero{position:absolute;bottom:0;image-rendering:pixelated;opacity:0;background:no-repeat 0 0/100% 100%}
+  #heroM{left:10px;width:136px;height:238px;background-image:url(assets/hero_m.png)}
+  #heroW{right:10px;width:136px;height:218px;background-image:url(assets/hero_w.png)}
+  #next.in #heroM{animation:walkInL 1.2s steps(12) forwards}
+  #next.in #heroW{animation:walkInR 1.2s steps(12) .15s both}
+  @keyframes walkInL{0%{opacity:1;transform:translate(-260px,0)}20%{transform:translate(-208px,-10px)}40%{transform:translate(-156px,0)}60%{transform:translate(-104px,-10px)}80%{transform:translate(-52px,0)}90%{transform:translate(-20px,-6px)}100%{opacity:1;transform:none}}
+  @keyframes walkInR{0%{opacity:1;transform:translate(260px,0)}20%{transform:translate(208px,-10px)}40%{transform:translate(156px,0)}60%{transform:translate(104px,-10px)}80%{transform:translate(52px,0)}90%{transform:translate(20px,-6px)}100%{opacity:1;transform:none}}
+  .hero.idle{opacity:1;animation:breath 1.2s steps(2) infinite !important}
+  #heroW.idle{animation-delay:.6s !important}
+  @keyframes breath{50%{transform:translateY(-4px)}}
+  #next h2{font-size:18px;color:var(--gold);margin-bottom:12px}
+  #next p{font-family:'Galmuri9';font-size:12px;line-height:1.8;color:#d9cff5}
+
+  /* ===== 모션 레이어 ===== */
+  #world{position:absolute;inset:0}
+  #world.shake{animation:shake .45s steps(9)}
+  @keyframes shake{0%,100%{transform:none}20%{transform:translate(-6px,4px)}40%{transform:translate(6px,-4px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(4px,2px)}}
+  .px{position:absolute;inset:0;will-change:transform;transition:transform .25s steps(5)}
+  #fx{position:absolute;left:0;top:0;width:390px;height:844px;pointer-events:none;z-index:20}
+
+  /* 로고 뒤 회전 광선 */
+  #rays{position:absolute;left:50%;top:150px;width:720px;height:720px;margin:-360px 0 0 -360px;opacity:0;pointer-events:none;
+        background:repeating-conic-gradient(from 0deg,rgba(255,236,150,.55) 0 9deg,rgba(255,236,150,0) 9deg 22.5deg);
+        -webkit-mask:radial-gradient(circle,#000 0,#000 18%,transparent 62%);mask:radial-gradient(circle,#000 0,#000 18%,transparent 62%);
+        animation:spin 24s steps(240) infinite}
+  #rays.in{opacity:1;transition:opacity .6s steps(6)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* 로고 반짝 스윕 */
+  #logoWrap{position:absolute;left:50%;top:44px;width:344px;height:240px;margin-left:-172px}
+  #logoWrap #logo{position:absolute;left:0;top:0;margin:0}
+  #shine{position:absolute;left:0;top:0;width:344px;height:240px;pointer-events:none;
+         -webkit-mask:url(assets/logo.png) 0 0/344px 240px no-repeat;mask:url(assets/logo.png) 0 0/344px 240px no-repeat;
+         background:linear-gradient(105deg,transparent 0 40%,rgba(255,255,255,.95) 40% 46%,transparent 46% 52%,rgba(255,255,255,.8) 52% 54%,transparent 54%) -400px 0/300% 100% no-repeat;
+         opacity:0}
+  #shine.go{opacity:1;animation:sweep 3.2s steps(24) infinite}
+  @keyframes sweep{0%{background-position:120% 0}45%,100%{background-position:-60% 0}}
+
+  /* 시작 버튼 숨쉬기 + 링 */
+  #start.in{animation:breathe 1.1s steps(4) infinite}
+  @keyframes breathe{50%{transform:scale(1.06)}}
+  #start::before{content:"";position:absolute;inset:-4px;border:4px solid var(--gold);opacity:0;pointer-events:none}
+  #start.in::before{animation:ring 1.4s steps(7) infinite}
+  @keyframes ring{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.35,1.8)}}
+
+  /* 마스코트 점프 */
+  #mascots{cursor:pointer}
+  #mascots.jump{animation:jump .6s steps(6) !important;opacity:1}
+  @keyframes jump{0%,100%{transform:translateY(0) scale(1)}15%{transform:translateY(4px) scale(1.06,.92)}50%{transform:translateY(-46px) scale(.96,1.05)}85%{transform:translateY(2px) scale(1.04,.95)}}
+
+  /* 보물상자 피날레 */
+  #chest{position:absolute;left:50%;top:380px;width:144px;margin-left:-72px;z-index:15;opacity:0;pointer-events:none}
+  #chest.in{animation:chestIn .6s steps(6) forwards}
+  #chest.wobble{opacity:1;animation:wob .5s steps(5) 2}
+  @keyframes chestIn{0%{opacity:1;transform:translateY(-500px) scale(.6)}70%{opacity:1;transform:translateY(10px) scale(1.15,.85)}100%{opacity:1;transform:none}}
+  @keyframes wob{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+  #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:18}
+  #flash.go{animation:flash .5s steps(5)}
+  @keyframes flash{0%{opacity:.95}100%{opacity:0}}
+
+  /* 코인 카운트 튕김 */
+  #coinCount.bump{animation:bump .25s steps(3)}
+  @keyframes bump{50%{transform:scale(1.5);display:inline-block}}
+  #hud span{display:inline-block}
+
+  /* 오프닝 프리롤 */
+  #pre{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:#0d0820;color:#fff;pointer-events:none}
+  #pre div{font-family:'Galmuri9';font-size:12px;letter-spacing:4px;color:#d9cff5;opacity:0;animation:preIn 1.6s steps(8) forwards}
+  #pre.out{animation:preOut .3s steps(3) forwards}
+  @keyframes preIn{0%{opacity:0;letter-spacing:14px}40%,80%{opacity:1;letter-spacing:4px}100%{opacity:0}}
+  @keyframes preOut{to{opacity:0}}
+
+  /* ===================== 게임 화면 공통 ===================== */
+  #fx{z-index:60 !important}
+  .screen{position:absolute;inset:0;z-index:30;display:none;overflow:hidden}
+  .screen.on{display:block}
+  .pbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 18px;border:0;cursor:pointer;
+        font-family:'Galmuri11';font-weight:700;font-size:15px;color:#fff;background:var(--purple);text-decoration:none;
+        box-shadow:0 -3px 0 var(--purple),0 3px 0 var(--purple),-3px 0 0 var(--purple),3px 0 0 var(--purple),inset 0 -5px 0 #33106a,0 7px 0 rgba(43,26,20,.25)}
+  .pbtn:active{transform:translateY(3px)}
+  .pbtn.gold{background:var(--gold);color:var(--ink);box-shadow:0 -3px 0 var(--gold),0 3px 0 var(--gold),-3px 0 0 var(--gold),3px 0 0 var(--gold),inset 0 -5px 0 #c98a0e,0 7px 0 rgba(43,26,20,.25)}
+  .pbtn.ghost{background:#fff;color:var(--purple);box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,inset 0 -5px 0 #e4dcf3,0 7px 0 rgba(43,26,20,.18)}
+  #goMap{margin-top:22px;opacity:0}
+  #next{pointer-events:none} #next.in{pointer-events:auto}
+  #next.in #goMap{animation:pop .5s steps(5) 1.6s forwards}
+
+  /* ===================== 지도 화면 ===================== */
+  #mapScr{background:var(--sky2)}
+  #mapTop{position:absolute;left:0;right:0;top:0;z-index:3;padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;
+          background:linear-gradient(180deg,var(--sky2) 70%,rgba(184,228,251,0))}
+  #mapTop .st{font-family:'Galmuri9';font-size:11px;letter-spacing:2px;color:var(--purple)}
+  #mapTop h3{font-size:19px;margin-top:4px;color:var(--ink)}
+  #heartCnt{display:flex;align-items:center;gap:6px;font-family:'Galmuri11';font-weight:700;font-size:15px;color:var(--purple);background:#fff;padding:8px 10px;cursor:pointer;
+            box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 6px 0 rgba(43,26,20,.15)}
+  #mapView{position:absolute;left:0;right:0;top:0;height:470px;overflow:hidden}
+  #mapInner{position:absolute;left:0;top:0;width:944px;height:996px;transform-origin:0 0;
+            transition:transform .8s steps(10)}
+  #mapImg{position:absolute;inset:0;background:url(assets/map.png) 0 0/944px 996px;image-rendering:pixelated}
+  #mapPath{position:absolute;inset:0;pointer-events:none}
+  #mapPath polyline{fill:none;stroke:#fff;stroke-width:6;stroke-dasharray:6 10;animation:ants 1s steps(4) infinite}
+  @keyframes ants{to{stroke-dashoffset:-16}}
+  .zmark{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;cursor:pointer}
+  .zmark .flag{font-family:'Galmuri11';font-weight:700;font-size:27px;white-space:nowrap;color:#fff;background:var(--purple);padding:10px 16px;
+               box-shadow:0 -4px 0 var(--purple),0 4px 0 var(--purple),-4px 0 0 var(--purple),4px 0 0 var(--purple),0 10px 0 rgba(43,26,20,.3)}
+  .zmark.final .flag{background:#e8344e;box-shadow:0 -4px 0 #e8344e,0 4px 0 #e8344e,-4px 0 0 #e8344e,4px 0 0 #e8344e,0 10px 0 rgba(43,26,20,.3)}
+  .zmark.locked .flag{background:#8b8199;box-shadow:0 -4px 0 #8b8199,0 4px 0 #8b8199,-4px 0 0 #8b8199,4px 0 0 #8b8199,0 10px 0 rgba(43,26,20,.3)}
+  .zmark .pin{width:24px;height:24px;margin-top:12px;background:#fff;box-shadow:0 0 0 5px var(--gold);animation:pinPulse 1s steps(2) infinite}
+  .zmark.cur .pin{box-shadow:0 0 0 5px #e8344e}
+  @keyframes pinPulse{50%{box-shadow:0 0 0 10px rgba(246,178,28,.35)}}
+  #duo{position:absolute;display:flex;gap:2px;transform:translate(-50%,-100%);pointer-events:none;transition:left .9s steps(9),top .9s steps(9)}
+  #duo img{height:120px;image-rendering:pixelated;animation:hop 0.8s steps(2) infinite}
+  #duo img+img{animation-delay:.4s}
+  #zoneTabs{position:absolute;left:16px;right:16px;top:440px;z-index:3;display:flex;gap:8px}
+  .ztab{flex:1;height:44px;border:0;cursor:pointer;font-family:'Galmuri11';font-weight:700;font-size:13px;color:var(--purple);background:#fff;
+        box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 6px 0 rgba(43,26,20,.15)}
+  .ztab small{display:block;font-family:'Galmuri9';font-weight:400;font-size:10px;color:#8b8199;margin-top:2px}
+  .ztab.on{background:var(--purple);color:#fff;box-shadow:0 -3px 0 var(--purple),0 3px 0 var(--purple),-3px 0 0 var(--purple),3px 0 0 var(--purple),0 6px 0 rgba(43,26,20,.25)}
+  .ztab.on small{color:#d9cff5}
+  #spotList{position:absolute;left:0;right:0;top:500px;bottom:0;overflow-y:auto;padding:14px 16px 28px;background:var(--cream)}
+  .scard{display:flex;align-items:center;gap:14px;padding:14px;margin-bottom:12px;background:#fff;cursor:pointer;
+         box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 7px 0 rgba(43,26,20,.12);animation:cardIn .4s steps(4) both}
+  .scard:active{transform:translateY(3px)}
+  @keyframes cardIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+  .scard .no{flex:none;width:42px;height:42px;display:grid;place-items:center;font-family:'Galmuri11';font-weight:700;font-size:18px;color:#fff;background:var(--purple)}
+  .scard .tx{flex:1;min-width:0}
+  .scard b{display:block;font-size:16px}
+  .scard span{display:block;margin-top:4px;font-family:'Galmuri9';font-size:11px;color:#8b8199}
+  .scard .stt{flex:none;font-family:'Galmuri9';font-size:11px;padding:6px 8px;color:var(--purple);background:#efe8fa}
+  .scard.found .no{background:#e8344e} .scard.found .stt{color:#fff;background:#e8344e}
+  .scard.lock{opacity:.55;cursor:default} .scard.lock .no{background:#8b8199}
+
+  /* ===================== 스팟 상세 ===================== */
+  #spotScr{z-index:40;background:rgba(13,8,32,.55)}
+  #spotCard{position:absolute;left:12px;right:12px;bottom:12px;padding:22px 18px 18px;background:var(--cream);
+            box-shadow:0 -4px 0 var(--cream),0 4px 0 var(--cream),-4px 0 0 var(--cream),4px 0 0 var(--cream),0 12px 0 rgba(0,0,0,.25)}
+  #spotScr.on #spotCard{animation:sheetUp .45s steps(5)}
+  @keyframes sheetUp{from{transform:translateY(110%)}to{transform:none}}
+  #spotCard .x{position:absolute;right:14px;top:12px;width:36px;height:36px;border:0;background:none;font-family:'Galmuri11';font-size:20px;cursor:pointer;color:var(--ink)}
+  #spotCard .lbl{font-family:'Galmuri9';font-size:11px;letter-spacing:2px;color:var(--purple)}
+  #spotCard h3{font-size:24px;margin:6px 0 4px}
+  #spotCard .addr{font-family:'Galmuri9';font-size:11px;color:#8b8199}
+  #spotHint{display:flex;gap:10px;align-items:flex-end;margin:16px 0}
+  #spotHint img{width:76px;flex:none;image-rendering:pixelated}
+  #spotHint p{flex:1;padding:12px;background:#fff;font-size:13px;line-height:1.6;box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff}
+  #spotCard .how{font-family:'Galmuri9';font-size:11px;line-height:1.7;color:#5a4e6b;margin:4px 0 14px}
+  #spotCard .row{display:flex;gap:10px}
+  #spotCard .row>*{flex:1}
+  #codeRow{display:flex;gap:8px;margin-top:14px}
+  #codeIn{flex:1;min-width:0;height:44px;padding:0 12px;border:0;font-family:'Galmuri11';font-size:15px;background:#fff;letter-spacing:1px;
+          box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,inset 0 3px 0 #eee}
+  #codeRow .pbtn{height:44px;font-size:13px}
+  #codeMsg{min-height:16px;margin-top:8px;font-family:'Galmuri9';font-size:11px;color:#e8344e}
+  #codeRow.shake{animation:shake .4s steps(8)}
+
+  /* ===================== 봉투 발견 ===================== */
+  #foundScr{z-index:50;background:radial-gradient(circle at 50% 40%,#3a1f6e 0,#160c30 70%)}
+  #foundRays{position:absolute;left:50%;top:300px;width:900px;height:900px;margin:-450px 0 0 -450px;
+             background:repeating-conic-gradient(from 0deg,rgba(255,143,160,.35) 0 8deg,transparent 8deg 20deg);
+             -webkit-mask:radial-gradient(circle,#000 10%,transparent 60%);mask:radial-gradient(circle,#000 10%,transparent 60%);
+             animation:spin 18s steps(180) infinite;opacity:0}
+  #foundScr.lit #foundRays{opacity:1;transition:opacity .4s steps(4)}
+  #foundHead{position:absolute;left:0;right:0;top:70px;text-align:center;color:#fff}
+  #foundHead .k{font-family:'Galmuri9';font-size:12px;letter-spacing:3px;color:#ff8fa0}
+  #foundHead h3{margin-top:8px;font-size:22px}
+  #env{position:absolute;left:50%;top:190px;margin-left:-120px;width:240px;opacity:0;image-rendering:pixelated}
+  #env.drop{animation:chestIn .6s steps(6) forwards}
+  #env.wob{opacity:1;animation:wob .4s steps(4) 3}
+  #paper{position:absolute;left:36px;right:36px;top:250px;padding:22px 20px;background:#fffaf0;opacity:0;text-align:center;
+         box-shadow:0 -4px 0 #fffaf0,0 4px 0 #fffaf0,-4px 0 0 #fffaf0,4px 0 0 #fffaf0,0 12px 0 rgba(0,0,0,.3)}
+  #paper.up{animation:paperUp .7s steps(7) forwards}
+  @keyframes paperUp{from{opacity:1;transform:translateY(160px) scale(.5)}to{opacity:1;transform:none}}
+  #paper .n{font-family:'Galmuri9';font-size:11px;letter-spacing:2px;color:#e8344e}
+  #paperTxt{min-height:76px;margin-top:12px;font-size:16px;line-height:1.75;color:var(--ink);word-break:keep-all}
+  #stamp{position:absolute;right:-6px;top:-22px;padding:8px 10px;font-family:'Galmuri11';font-weight:700;font-size:14px;color:#e8344e;background:#fff;
+         box-shadow:0 0 0 3px #e8344e;transform:rotate(12deg) scale(3);opacity:0}
+  #stamp.hit{animation:stampHit .35s steps(4) forwards}
+  @keyframes stampHit{to{opacity:1;transform:rotate(12deg) scale(1)}}
+  #foundFoot{position:absolute;left:0;right:0;bottom:56px;text-align:center;opacity:0}
+  #foundFoot.in{opacity:1;transition:opacity .3s steps(3)}
+  #foundFoot p{font-family:'Galmuri9';font-size:12px;color:#d9cff5;margin-bottom:16px}
+
+  /* ===================== 편지함 ===================== */
+  #letterScr{z-index:45;background:#fdf3e1}
+  #letterScr .head{padding:20px 16px 12px;display:flex;align-items:center;justify-content:space-between}
+  #letterScr h3{font-size:20px}
+  #letterScr .back{border:0;background:none;font-family:'Galmuri11';font-size:14px;color:var(--purple);cursor:pointer;padding:8px}
+  #letterBody{position:absolute;left:16px;right:16px;top:72px;bottom:16px;overflow-y:auto;padding:22px 18px;background:#fff;
+              background-image:repeating-linear-gradient(180deg,transparent 0 33px,#f3e6d0 33px 35px);
+              box-shadow:0 -4px 0 #fff,0 4px 0 #fff,-4px 0 0 #fff,4px 0 0 #fff}
+  .lline{display:flex;gap:10px;font-size:15px;line-height:35px;animation:cardIn .4s steps(4) both}
+  .lline i{flex:none;font-style:normal;font-family:'Galmuri9';font-size:11px;color:#e8344e;width:22px}
+  .lline.miss{color:#c9bfd8}
+  #letterDone{margin-top:18px;text-align:center;font-size:14px;color:var(--purple);display:none}
+
+  /* ===================== 안내 캐릭터 ===================== */
+  .guide{display:flex;align-items:flex-end;flex:none}
+  .guide img{image-rendering:pixelated;animation:hop .8s steps(2) infinite}
+  .guide img+img{margin-left:-14px;animation-delay:.4s}
+  #spotGuide img{height:96px}
+  #spotHint p{position:relative}
+  /* ===================== 획득 2종 ===================== */
+  #paper .n{font-size:13px}
+  #gotRow{display:flex;gap:10px;justify-content:center;margin-top:12px}
+  .got{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;background:#f6effc;opacity:0;transform:scale(.3)}
+  .got.pop{animation:pop .45s steps(5) forwards}
+  .got canvas{image-rendering:pixelated;height:56px}
+  .got b{height:56px;display:grid;place-items:center;font-size:40px;color:#e8344e;font-weight:400}
+  .got span{font-family:'Galmuri9';font-size:11px;color:var(--purple)}
+  #paperTxt{min-height:60px}
+  #paper{top:230px}
+  /* ===================== 문장 책 ===================== */
+  #bookScr{z-index:52;background:linear-gradient(180deg,#ffe9c7,#f7d6ae)}
+  #bookHead{position:absolute;left:14px;right:14px;top:14px;display:flex;align-items:flex-end;gap:8px;height:120px}
+  #bookGuide img{height:116px}
+  #bookBubble{flex:1;margin-bottom:22px;padding:12px;background:#fff;font-size:14px;line-height:1.55;
+              box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 7px 0 rgba(43,26,20,.15)}
+  #book{position:absolute;left:18px;right:18px;top:148px;bottom:150px;padding:24px 22px 18px 34px;background:#fffaf0;overflow-y:auto;
+        box-shadow:0 0 0 4px #fffaf0,0 0 0 8px var(--purple),-4px 0 0 8px var(--purple),0 14px 0 8px rgba(75,26,140,.25);
+        background-image:linear-gradient(90deg,#f1e2c8 0 6px,transparent 6px),repeating-linear-gradient(180deg,transparent 0 39px,#f4e7d2 39px 41px)}
+  #book .ribbon{position:absolute;right:22px;top:-8px;width:14px;height:46px;background:#e8344e;clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%)}
+  #book h4{font-size:15px;color:var(--purple);margin-bottom:10px;letter-spacing:1px}
+  .bline{display:flex;gap:10px;padding:9px 0;font-size:15px;line-height:1.6;word-break:keep-all;color:var(--ink)}
+  .bline i{flex:none;font-style:normal;font-family:'Galmuri9';font-size:11px;color:#e8344e;padding-top:3px}
+  .bline.new{animation:lineDrop .7s steps(7) both}
+  .bline.new span{background:linear-gradient(transparent 55%,#ffe066 55%)}
+  @keyframes lineDrop{0%{opacity:0;transform:translateY(-60px) rotate(-3deg)}70%{opacity:1;transform:translateY(4px)}100%{opacity:1;transform:none}}
+  .bline.empty{color:#c9bfd8}
+  #bookFoot{position:absolute;left:18px;right:18px;bottom:22px;height:104px;display:flex;align-items:center;gap:14px}
+  #miniPuzzle{flex:none;height:96px;image-rendering:pixelated;box-shadow:0 0 0 3px #fff}
+  #bookFoot>div{flex:1}
+  #bookFoot p{font-family:'Galmuri9';font-size:12px;color:#7a5a3a;margin-bottom:10px}
+  #bookFoot .pbtn{width:100%}
+  /* ===================== 최종 편지 ===================== */
+  #finalScr{z-index:55;background:radial-gradient(circle at 50% 30%,#ffd1dc 0,#ffe9c7 45%,#f7d6ae 100%)}
+  #finalRays{position:absolute;left:50%;top:210px;width:900px;height:900px;margin:-450px 0 0 -450px;
+             background:repeating-conic-gradient(from 0deg,rgba(255,255,255,.55) 0 8deg,transparent 8deg 20deg);
+             -webkit-mask:radial-gradient(circle,#000 10%,transparent 60%);mask:radial-gradient(circle,#000 10%,transparent 60%);animation:spin 20s steps(200) infinite}
+  #finalHead{position:absolute;left:0;right:0;top:36px;text-align:center}
+  #finalHead .k{font-family:'Galmuri9';font-size:11px;letter-spacing:3px;color:#e8344e}
+  #finalHead h3{font-size:22px;color:var(--purple);margin-top:6px}
+  #bigPuzzle{position:absolute;left:50%;top:100px;width:320px;margin-left:-160px;image-rendering:pixelated;box-shadow:0 0 0 4px #fff,0 0 0 8px var(--purple),0 14px 0 8px rgba(75,26,140,.25);transition:transform .6s steps(6),top .6s steps(6)}
+  #finalScr.lettered #bigPuzzle{transform:scale(.45);top:20px}
+  #finalScr.lettered #finalHead{opacity:0}
+  #finalDuo{position:absolute;left:50%;bottom:-200px;transform:translateX(-50%);display:flex;align-items:flex-end;transition:bottom .6s steps(6)}
+  #finalDuo img{height:150px;image-rendering:pixelated;animation:hop .8s steps(2) infinite}
+  #finalDuo img+img{margin-left:-10px;animation-delay:.4s}
+  #finalScr.duo #finalDuo{bottom:18px}
+  #finalBubble{position:absolute;left:30px;right:30px;bottom:186px;padding:12px;text-align:center;background:#fff;font-size:14px;opacity:0;
+               box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 7px 0 rgba(43,26,20,.15)}
+  #finalScr.duo #finalBubble{opacity:1;transition:opacity .3s steps(3) .5s}
+  #finalScr.lettered #finalBubble{opacity:0}
+  #finalLetter{position:absolute;left:22px;right:22px;top:150px;bottom:190px;padding:24px 22px;overflow-y:auto;background:#fffaf0;opacity:0;
+               background-image:repeating-linear-gradient(180deg,transparent 0 33px,#f4e7d2 33px 35px);
+               box-shadow:0 0 0 4px #fffaf0,0 0 0 8px #e8344e,0 14px 0 8px rgba(232,52,78,.25)}
+  #finalScr.lettered #finalLetter{animation:paperUp .7s steps(7) forwards}
+  #flTtl{font-size:17px;color:#e8344e;text-align:center;margin-bottom:14px}
+  #flBody{font-size:15px;line-height:35px;word-break:keep-all;white-space:pre-line}
+  #flSign{margin-top:14px;text-align:right;font-size:14px;color:var(--purple)}
+  #finalFoot{position:absolute;left:0;right:0;bottom:24px;text-align:center;opacity:0;pointer-events:none}
+  #finalScr.end #finalFoot{opacity:1;pointer-events:auto}
+  #finalScr.end #finalDuo{bottom:-200px}
+
+  /* ===================== 대화 장면 (스팟) ===================== */
+  #spotScr{z-index:40;background:#1b1030}
+  #vnBg{position:absolute;left:0;top:0;width:944px;height:996px;background:url(assets/map.png) 0 0/944px 996px;image-rendering:pixelated;transform-origin:0 0}
+  #vnShade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(27,16,48,.15) 0,rgba(27,16,48,.05) 40%,rgba(27,16,48,.55) 100%)}
+  #vnTitle{position:absolute;left:14px;top:16px;padding:12px 16px 12px 14px;background:var(--cream);max-width:300px;
+           box-shadow:0 -3px 0 var(--cream),0 3px 0 var(--cream),-3px 0 0 var(--cream),3px 0 0 var(--cream),0 8px 0 rgba(0,0,0,.25)}
+  #spotScr.on #vnTitle{animation:slideL .45s steps(5)}
+  @keyframes slideL{from{transform:translateX(-120%)}to{transform:none}}
+  #vnTitle .lbl{font-family:'Galmuri9';font-size:11px;letter-spacing:2px;color:var(--purple)}
+  #vnTitle h3{font-size:22px;margin:4px 0 2px}
+  #vnTitle .addr{font-family:'Galmuri9';font-size:10px;color:#8b8199}
+  #spotX{position:absolute;right:14px;top:16px;width:42px;height:42px;border:0;cursor:pointer;font-family:'Galmuri11';font-size:18px;color:var(--ink);background:#fff;
+         box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 6px 0 rgba(0,0,0,.25)}
+  #vnChars{position:absolute;left:0;right:0;bottom:362px;height:360px;pointer-events:none}
+  #vnChars img{position:absolute;bottom:0;image-rendering:pixelated;transition:filter .2s steps(2),transform .3s steps(3)}
+  #vnChars img.solo{height:330px;right:6px}
+  #vnChars img.l{height:270px;left:34px} #vnChars img.r{height:290px;right:30px}
+  #vnChars img.dim{filter:brightness(.5) saturate(.7);transform:translateY(8px)}
+  #vnChars img.talk{animation:talkBob .5s steps(2) infinite}
+  @keyframes talkBob{50%{transform:translateY(-6px)}}
+  #spotScr.on #vnChars img{animation:charIn .5s steps(5) both}
+  #spotScr.on #vnChars img.talk{animation:charIn .5s steps(5) both, talkBob .5s steps(2) .5s infinite}
+  @keyframes charIn{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:none}}
+  #vnBox{position:absolute;left:12px;right:12px;bottom:206px;height:140px;padding:30px 20px 16px;background:#fff;cursor:pointer;
+         box-shadow:0 -6px 0 #fff,0 6px 0 #fff,-6px 0 0 #fff,6px 0 0 #fff,0 -6px 0 3px #f0d6e6,0 6px 0 3px #f0d6e6,-6px 0 0 3px #f0d6e6,6px 0 0 3px #f0d6e6,0 14px 0 4px rgba(0,0,0,.25)}
+  #vnName{position:absolute;left:-6px;top:-24px;min-width:120px;padding:9px 18px;font-family:'Galmuri11';font-weight:700;font-size:16px;color:#fff;background:#d6286e;
+          box-shadow:0 -3px 0 #d6286e,0 3px 0 #d6286e,-3px 0 0 #d6286e,3px 0 0 #d6286e,0 6px 0 rgba(0,0,0,.2)}
+  #vnName.purple{background:var(--purple);box-shadow:0 -3px 0 var(--purple),0 3px 0 var(--purple),-3px 0 0 var(--purple),3px 0 0 var(--purple),0 6px 0 rgba(0,0,0,.2)}
+  #vnName.orange{background:#e2662a;box-shadow:0 -3px 0 #e2662a,0 3px 0 #e2662a,-3px 0 0 #e2662a,3px 0 0 #e2662a,0 6px 0 rgba(0,0,0,.2)}
+  #vnText{font-family:'Galmuri11';font-size:18px;line-height:1.6;color:var(--ink);word-break:keep-all}
+  #vnNext{position:absolute;right:18px;bottom:10px;font-size:14px;color:#d6286e;animation:blink .8s steps(1) infinite;display:none}
+  #vnBox.wait #vnNext{display:block}
+  #vnChoices{position:absolute;left:12px;right:12px;bottom:22px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  #vnChoices .pbtn{flex:1 1 40%;height:46px;font-size:15px;animation:pop .35s steps(4) both}
+  #vnChoices .pbtn.wide{flex-basis:100%}
+  #vnChoices .pbtn:disabled{opacity:.5}
+  #codeRow{position:absolute;left:16px;right:16px;bottom:96px;display:none;gap:8px;margin:0}
+  #codeRow.on{display:flex}
+  #spotScr #codeMsg{position:absolute;left:16px;right:16px;bottom:150px;text-align:center;font-family:'Galmuri9';font-size:11px;color:#ffd1dc;min-height:0;margin:0}
+  /* ===================== 카메라 ===================== */
+  #camScr{z-index:48;background:#000}
+  #camVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  #camFrame{position:absolute;left:50%;top:300px;width:250px;height:250px;margin:-125px 0 0 -125px;box-shadow:0 0 0 999px rgba(13,8,32,.55)}
+  #camFrame i{position:absolute;width:44px;height:44px;border:6px solid #ff8fb1}
+  #camFrame i:nth-child(1){left:-6px;top:-6px;border-right:0;border-bottom:0}
+  #camFrame i:nth-child(2){right:-6px;top:-6px;border-left:0;border-bottom:0}
+  #camFrame i:nth-child(3){left:-6px;bottom:-6px;border-right:0;border-top:0}
+  #camFrame i:nth-child(4){right:-6px;bottom:-6px;border-left:0;border-top:0}
+  #camFrame b{position:absolute;left:8px;right:8px;top:0;height:4px;background:#ff8fb1;box-shadow:0 0 12px #ff8fb1;animation:scanY 1.6s steps(16) infinite alternate}
+  @keyframes scanY{to{top:246px}}
+  #camScr.hit #camFrame i{border-color:#ffe066} #camScr.hit #camFrame b{display:none}
+  #camTalk{position:absolute;left:12px;right:12px;bottom:96px;display:flex;align-items:flex-end;gap:8px}
+  #camGuide img{height:120px}
+  #camTalk p{flex:1;margin-bottom:16px;padding:12px;background:#fff;font-size:14px;line-height:1.55;
+             box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff}
+  #camCancel{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:160px}
+
+  /* ===================== 지도 (기본 = 전체 지도) ===================== */
+  #mapView{height:844px !important}
+  #mapBtns{display:flex;gap:8px}
+  .mbtn{width:54px;height:54px;border:0;cursor:pointer;font-size:20px;line-height:1;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+        box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 7px 0 rgba(43,26,20,.18)}
+  .mbtn small{font-family:'Galmuri9';font-size:10px;color:var(--purple)}
+  .mbtn:active{transform:translateY(3px)}
+  #mapHint{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);padding:10px 16px;white-space:nowrap;font-size:14px;color:#fff;background:var(--purple);
+           box-shadow:0 -3px 0 var(--purple),0 3px 0 var(--purple),-3px 0 0 var(--purple),3px 0 0 var(--purple),0 7px 0 rgba(0,0,0,.25);animation:float 1.6s steps(2) infinite}
+  #mapScr.zone #mapHint{display:none}
+  .zmark .flag{font-size:30px !important}
+  .zmark:hover .flag,.zmark:active .flag{transform:translateY(-4px)}
+  #zoneSheet{position:absolute;left:0;right:0;bottom:0;height:430px;padding:16px 16px 24px;background:var(--cream);transform:translateY(105%);transition:transform .45s steps(5);z-index:4;
+             box-shadow:0 -6px 0 var(--cream),0 -12px 0 rgba(43,26,20,.12)}
+  #mapScr.zone #zoneSheet{transform:none}
+  #zoneSheet .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  #zoneSheet small{display:block;font-family:'Galmuri9';font-size:11px;letter-spacing:2px;color:var(--purple)}
+  #zoneSheet b{font-size:20px}
+  #zsClose{border:0;background:none;cursor:pointer;font-family:'Galmuri11';font-size:13px;color:var(--purple);padding:8px}
+  #spotList{position:static !important;padding:0 !important;background:none !important;overflow-y:auto;max-height:350px}
+  /* ===================== 퍼즐 보기 ===================== */
+  #puzzleScr{z-index:45;background:linear-gradient(180deg,#e7dcf7,#fdf3e1)}
+  #puzzleScr .head{padding:20px 16px 12px;display:flex;align-items:center;justify-content:space-between}
+  #puzzleScr h3{font-size:20px}
+  #puzzleScr .back{border:0;background:none;font-family:'Galmuri11';font-size:14px;color:var(--purple);cursor:pointer;padding:8px}
+  #pzBoard{display:block;margin:30px auto 0;width:340px;image-rendering:pixelated;box-shadow:0 0 0 4px #fff,0 0 0 8px var(--purple),0 14px 0 8px rgba(75,26,140,.2)}
+  #pzCnt{margin-top:30px;text-align:center;font-size:15px;color:var(--purple)}
+  #pzFoot{margin-top:24px;text-align:center}
+  #restart{border:0;background:none;cursor:pointer;font-family:'Galmuri9';font-size:12px;letter-spacing:1px;color:var(--purple);text-decoration:underline;padding:6px}
+  #toast{position:absolute;left:50%;top:84px;z-index:70;transform:translate(-50%,-20px);padding:10px 16px;white-space:nowrap;font-size:13px;color:#fff;background:#1f8a3e;opacity:0;pointer-events:none;
+         box-shadow:0 -3px 0 #1f8a3e,0 3px 0 #1f8a3e,-3px 0 0 #1f8a3e,3px 0 0 #1f8a3e,0 7px 0 rgba(0,0,0,.25);transition:opacity .2s steps(2),transform .2s steps(2)}
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* ===================== 스팟 배경·NPC ===================== */
+  #vnBg.pic{width:390px;height:698px;background-size:390px 698px;background-repeat:no-repeat;transform:none}
+  #spotScr{background:#2a1c3e}
+  #vnChars img.npc{height:250px}
+  #vnChars img.npc.small{height:118px}
+  #vnChars img.gd{height:230px}
+  #vnName.npc{background:#2f8f5b;box-shadow:0 -3px 0 #2f8f5b,0 3px 0 #2f8f5b,-3px 0 0 #2f8f5b,3px 0 0 #2f8f5b,0 6px 0 rgba(0,0,0,.2)}
+  /* ===================== 선물 · 레벨업 ===================== */
+  #giftScr{z-index:49;background:radial-gradient(circle at 50% 45%,#5b3a8e 0,#1b1030 75%)}
+  #giftRays{position:absolute;left:50%;top:260px;width:900px;height:900px;margin:-450px 0 0 -450px;opacity:0;
+            background:repeating-conic-gradient(from 0deg,rgba(255,224,102,.45) 0 8deg,transparent 8deg 20deg);
+            -webkit-mask:radial-gradient(circle,#000 10%,transparent 60%);mask:radial-gradient(circle,#000 10%,transparent 60%);animation:spin 16s steps(160) infinite}
+  #giftScr.lvup #giftRays{opacity:1;transition:opacity .4s steps(4)}
+  #giftTop{position:absolute;left:0;right:0;top:90px;text-align:center;color:#fff}
+  #giftEmoji{font-size:96px;line-height:1;animation:chestIn .6s steps(6) both}
+  #giftTx{margin-top:14px;font-size:18px}
+  #giftScr.drink #giftEmoji{animation:sip 1.2s steps(6) forwards}
+  @keyframes sip{0%{transform:none}30%{transform:translateY(160px) rotate(-30deg) scale(.8)}100%{transform:translateY(200px) rotate(-60deg) scale(.2);opacity:0}}
+  #giftDuo{position:absolute;left:0;right:0;top:330px;display:flex;justify-content:center;gap:10px}
+  .hb{position:relative;text-align:center}
+  .hb img{height:220px;image-rendering:pixelated;display:block}
+  .hb span{display:inline-block;margin-top:6px;padding:3px 10px;font-size:12px;color:#fff;background:#d6286e}
+  .hb i{position:absolute;top:24%;width:16px;height:8px;background:#ff6f8f;opacity:0}
+  .hb i:nth-of-type(1){left:30%} .hb i:nth-of-type(2){left:58%}
+  #giftScr.tipsy .hb i{opacity:.85;transition:opacity .4s steps(4)}
+  #giftScr.tipsy .hb{animation:tipsy 1.4s steps(4) infinite}
+  #giftScr.tipsy .hb+.hb{animation-delay:.35s}
+  @keyframes tipsy{0%,100%{transform:rotate(-5deg) translateX(-4px)}50%{transform:rotate(5deg) translateX(4px) translateY(-6px)}}
+  #giftBub{position:absolute;left:0;right:0;top:330px;height:10px;opacity:0}
+  #giftScr.tipsy #giftBub{opacity:1}
+  #giftBub b{position:absolute;font-size:22px;color:#ffd1dc;animation:bub 1.8s steps(9) infinite}
+  #giftBub b:nth-child(1){left:90px} #giftBub b:nth-child(2){left:150px;animation-delay:.4s} #giftBub b:nth-child(3){left:230px;animation-delay:.8s} #giftBub b:nth-child(4){left:290px;animation-delay:1.2s}
+  @keyframes bub{from{transform:translateY(0);opacity:1}to{transform:translateY(-90px);opacity:0}}
+  #giftMood{position:absolute;left:20px;right:20px;top:600px;text-align:center;color:#fff;font-size:16px;line-height:1.6}
+  #lvBox{position:absolute;left:24px;right:24px;top:110px;padding:22px 18px 18px;text-align:center;background:#fffaf0;display:none;
+         box-shadow:0 0 0 4px #fffaf0,0 0 0 8px var(--gold),0 14px 0 8px rgba(0,0,0,.3)}
+  #giftScr.lvup #lvBox{display:block;animation:pop .5s steps(5)}
+  #giftScr.lvup #giftTop,#giftScr.lvup #giftMood{display:none}
+  #giftScr.lvup #giftDuo,#giftScr.lvup #giftBub{top:500px}
+  #lvBox .lu{font-family:'Galmuri11';font-weight:700;font-size:34px;color:#e8344e;letter-spacing:2px;text-shadow:3px 3px 0 #ffe066}
+  #lvBox .lv{margin-top:8px;font-size:20px;color:var(--purple)}
+  #lvBox .st{margin:14px 0 16px;font-size:14px;line-height:1.9;color:var(--ink)}
+  #lvBox em{font-style:normal;color:#e8344e}
+
+  /* ===== 캐릭터 공통(.ch) · 자유 장면 · NPC 모션 ===== */
+  #vnChars .ch{position:absolute;bottom:0;image-rendering:pixelated;transition:filter .2s steps(2),transform .4s steps(4),opacity .4s steps(4)}
+  #vnChars .ch.dim{filter:brightness(.5) saturate(.7);transform:translateY(8px)}
+  #vnChars .ch.talk{animation:talkBob .5s steps(2) infinite}
+  #spotScr.on #vnChars img.ch.gone,#spotScr #vnChars .ch.gone{animation:none;transform:translateX(260px);opacity:0}
+  #spotScr.free #vnBox{opacity:0;pointer-events:none;transform:translateY(20px)}
+  #vnBox{transition:opacity .25s steps(3),transform .25s steps(3)}
+  #vnChars .drink{width:117px;height:250px;background:url(assets/npc_uncle_anim.png) 0 0/234px 250px no-repeat;animation:drinkCycle 3.6s steps(1) infinite}
+  @keyframes drinkCycle{0%,55%{background-position:0 0}56%,92%{background-position:-117px 0}93%,100%{background-position:0 0}}
+  #vnChars .drink.talk{animation:drinkCycle 3.6s steps(1) infinite,talkBob .5s steps(2) infinite}
+  #vnChars .wag{height:118px;width:141px}
+  #vnChars .wag img{position:absolute;left:0;bottom:0;height:118px;image-rendering:pixelated}
+  #spotScr #vnChars .wag img{animation:none;transition:none}
+  #spotScr.on #vnChars .wag img.tail{transform-origin:66% 60%;animation:wagTail .36s steps(2) infinite}
+  @keyframes wagTail{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(8deg)}}
+  #vnChars .wag{animation:dogBreath 1.6s steps(2) infinite}
+  @keyframes dogBreath{50%{transform:translateY(-2px)}}
+  #codeIn{outline:none;border:0}
+  #codeIn:focus{box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 0 0 6px #ff8fb1}
+  #vnChars img.pc{height:205px}
+  #vnChars img.pc[data-who="gana"]{height:188px}
+  #spotScr.free #vnChars img.pc:not(.gone){animation:heroIdle 1s steps(2) infinite}
+  #spotScr.free #vnChars img.pc[data-who="gana"]:not(.gone){animation-delay:.5s}
+  @keyframes heroIdle{50%{transform:translateY(-4px)}}
+  small.from{display:block;margin-top:4px;font-family:'Galmuri9';font-size:11px;line-height:1.5;color:#8b8199;background:none}
+  #paperTxt{font-size:15px}
+  /* 선물 효과: bless(종·금빛) / wish(연등) */
+  #giftScr.bless .hb img{animation:blessGlow .8s steps(2) infinite}
+  @keyframes blessGlow{0%,100%{filter:drop-shadow(0 0 0 #ffe066)}50%{filter:drop-shadow(0 0 10px #ffe066) drop-shadow(0 0 4px #fff)}}
+  #giftScr.bless #giftBub,#giftScr.wish #giftBub{opacity:1}
+  #giftScr.bless #giftBub b{color:#ffe066}
+  #giftFloat{position:absolute;left:50%;top:330px;margin-left:-28px;font-size:56px;line-height:1;opacity:0;pointer-events:none}
+  #giftScr.wish #giftFloat{animation:lanternUp 3.2s steps(16) forwards}
+  @keyframes lanternUp{0%{opacity:1;transform:translateY(60px)}25%{transform:translate(-12px,-60px)}50%{transform:translate(12px,-160px)}75%{transform:translate(-8px,-250px)}100%{opacity:0;transform:translate(6px,-330px)}}
+  #giftScr.wish .hb{animation:prayBob 1.2s steps(2) infinite}
+  @keyframes prayBob{50%{transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+  <div class="px" data-depth="6"><div id="map"></div></div>
+  <div id="haze"></div>
+  <div class="px" data-depth="14"><div id="rays"></div></div>
+  <div class="px" data-depth="22"><div id="clouds"></div></div>
+
+  <div id="hud">
+    <div class="row"><canvas id="hudCoin" data-sprite="coin" data-scale="2"></canvas><span>× <span id="coinCount">000</span></span></div>
+    <div class="row"><canvas data-sprite="heart" data-scale="2"></canvas><canvas data-sprite="heart" data-scale="2"></canvas><canvas data-sprite="heart" data-scale="2"></canvas></div>
+  </div>
+
+  <div class="px" data-depth="10" style="pointer-events:none"><div id="logoWrap">
+    <img id="logo" src="assets/logo.png" alt="가나랜드 GANGHWADO"><div id="shine"></div>
+  </div></div>
+  <div id="title">
+    <div class="ko">강화읍 보물찾기</div>
+    <div class="en">TREASURE HUNT</div>
+  </div>
+
+  <div id="bubble"></div>
+  <img id="mascots" src="assets/mascots.png" alt="가나랜드 타누키 친구들">
+
+  <button id="start" type="button">보물찾기 시작<span class="tri">▶</span></button>
+  <div id="tap">TAP TO START</div>
+
+  <canvas id="chest"></canvas>
+  </div><!-- /world -->
+  <img id="puzzleImg" src="assets/puzzle.png" alt="" style="display:none"><canvas id="fx"></canvas><div id="toast"></div>
+  <div id="flash"></div>
+  <div id="iris"></div>
+  <div id="pre"><div>GANA LAND PRESENTS</div></div>
+  <div id="next">
+    <div>
+      <h2>STAGE 1 · 온수리</h2>
+      <div id="heroes"><div class="hero" id="heroM"></div><div class="hero" id="heroW"></div></div>
+      <p>보물 탐험대 출동!<br>하트 봉투를 모아 퍼즐 조각을 모아 줘</p>
+      <button class="pbtn gold" id="goMap">지도 열기 ▶</button>
+    </div>
+  </div>
+
+  <!-- ===== 지도 ===== -->
+  <div class="screen" id="mapScr">
+    <div id="mapView"><div id="mapInner"><div id="mapImg"></div><svg id="mapPath" viewBox="0 0 944 996"></svg><div id="marks"></div>
+      <div id="duo"><img src="assets/hero_m.png" alt=""><img src="assets/hero_w.png" alt=""></div></div></div>
+    <div id="mapTop"><div><div class="st" id="mapStage">STAGE 1</div><h3 id="mapZone">온수리 존</h3></div>
+      <div id="mapBtns"><button class="mbtn" id="btnBook">📖<small>문장</small></button><button class="mbtn" id="btnPuzzle">🧩<small>퍼즐</small></button></div></div>
+    <div id="mapHint">가고 싶은 곳을 눌러 봐!</div>
+    <div id="zoneSheet"><div class="sh"><div><small id="zsStage"></small><b id="zsName"></b></div><button id="zsClose">전체 지도 ✕</button></div><div id="spotList"></div></div>
+  </div>
+
+  <!-- ===== 스팟: 대화 장면 ===== -->
+  <div class="screen" id="spotScr">
+    <div id="vnBg"></div><div id="vnShade"></div>
+    <div id="vnTitle"><div class="lbl" id="spotLbl">SPOT 1</div><h3 id="spotName"></h3><div class="addr" id="spotAddr"></div></div>
+    <button id="spotX" aria-label="닫기">✕</button>
+    <div id="vnChars"></div>
+    <div id="vnBox"><div id="vnName"></div><div id="vnText"></div><div id="vnNext">▼</div></div>
+    <div id="codeRow"><input id="codeIn" placeholder="봉투 속 비밀 코드를 입력해 줘" autocomplete="off" autocapitalize="off"><button class="pbtn" id="codeGo">인증</button></div>
+    <div id="codeMsg"></div>
+    <div id="vnChoices"></div>
+  </div>
+
+  <!-- ===== 선물 · 레벨업 ===== -->
+  <div class="screen" id="giftScr">
+    <div id="giftRays"></div>
+    <div id="giftTop"><div id="giftEmoji">🍶</div><p id="giftTx"></p></div>
+    <div id="giftDuo"><div class="hb"><img src="assets/hero_m.png" alt="민수"><i></i><i></i><span>민수</span></div><div class="hb"><img src="assets/hero_w.png" alt="가나"><i></i><i></i><span>가나</span></div></div>
+    <div id="giftBub"><b>♪</b><b>♥</b><b>♪</b><b>♥</b></div><div id="giftFloat"></div>
+    <p id="giftMood"></p>
+    <div id="lvBox"><div class="lu">LEVEL UP!</div><div class="lv"><span id="lvFrom">Lv.1</span> ▶ <span id="lvTo">Lv.2</span></div>
+      <div class="st" id="lvStats"></div>
+      <button class="pbtn gold" id="giftOk">좋아! ▶</button></div>
+  </div>
+
+  <!-- ===== 카메라 QR 스캔 ===== -->
+  <div class="screen" id="camScr">
+    <video id="camVideo" playsinline muted></video>
+    <div id="camFrame"><i></i><i></i><i></i><i></i><b></b></div>
+    <div id="camTalk"><div class="guide" id="camGuide"></div><p id="camMsg">하트 봉투 속 QR을 네모 안에 맞춰 줘!</p></div>
+    <button class="pbtn ghost" id="camCancel">닫기</button>
+  </div>
+
+  <!-- ===== 봉투 발견 ===== -->
+  <div class="screen" id="foundScr">
+    <div id="foundRays"></div>
+    <div id="foundHead"><div class="k" id="foundK">TREASURE FOUND</div><h3 id="foundName"></h3></div>
+    <canvas id="env"></canvas>
+    <div id="paper"><div id="stamp">인증 완료!</div><div class="n">보물 2개 획득!</div>
+      <div id="gotRow"><div class="got" id="gotPiece"><canvas id="pieceCv"></canvas><span id="pieceTx">퍼즐 조각</span></div>
+      <div class="got" id="gotSent"><b>❦</b><span>작은 문장</span></div></div>
+      <div id="paperTxt"></div></div>
+    <div id="foundFoot"><p id="foundCnt"></p><button class="pbtn gold" id="foundGo">책에 담기 ▶</button></div>
+  </div>
+
+  <!-- ===== 문장 책 ===== -->
+  <div class="screen" id="bookScr">
+    <div id="bookHead"><div class="guide" id="bookGuide"></div><div id="bookBubble"></div></div>
+    <div id="book"><div class="ribbon"></div><h4 id="bookTtl"></h4><div id="bookLines"></div></div>
+    <div id="bookFoot"><canvas id="miniPuzzle"></canvas><div><p id="bookCnt"></p><button class="pbtn gold" id="bookGo">지도로 ▶</button></div></div>
+  </div>
+
+  <!-- ===== 퍼즐 보기 ===== -->
+  <div class="screen" id="puzzleScr">
+    <div class="head"><h3>모은 퍼즐 조각</h3><button class="back" id="puzzleBack">◀ 지도</button></div>
+    <canvas id="pzBoard"></canvas>
+    <p id="pzCnt"></p>
+    <div id="pzFoot"></div>
+  </div>
+
+  <!-- ===== 최종 편지 ===== -->
+  <div class="screen" id="finalScr">
+    <div id="finalRays"></div>
+    <div id="finalHead"><div class="k">ALL PUZZLE PIECES</div><h3>퍼즐 완성!</h3></div>
+    <canvas id="bigPuzzle"></canvas>
+    <div id="finalDuo"><img src="assets/guide_orange.png" alt=""><img src="assets/guide_purple.png" alt=""></div>
+    <div id="finalBubble">우리가 주는 편지야! 열어 봐 ♥</div>
+    <div id="finalLetter"><h4 id="flTtl"></h4><div id="flBody"></div><div id="flSign"></div></div>
+    <div id="finalFoot"><button class="pbtn ghost" id="finalBook">문장 책 다시 보기</button></div>
+  </div>
+  </div>
+</div>
+
+<script src="data.js?v=mvgqjo9a"></script>
+<script>
+/* ---------- 픽셀 스프라이트 ---------- */
+const PAL = {
+  k:'#2b1a14', y:'#f6b21c', Y:'#ffe066', o:'#c97a0e', w:'#ffffff',
+  r:'#e8344e', R:'#ff8fa0', b:'#7a4a22', B:'#a8692f', p:'#4b1a8c', c:'#fff1b0'
+};
+const SPRITES = {
+  coin:[
+    '..kkkk..','.kYYYyk.','kYYyyyok','kYyYyyok','kYyYyyok','kYyyyyok','.kyoook.','..kkkk..'],
+  heart:[
+    '.kk.kk..','kRrkrrk.','krrrrrk.','krrrrrk.','.krrrk..','..krk...','...k....','........'],
+  spark:[
+    '...y...','...Y...','..yYy..','yYYwYYy','..yYy..','...Y...','...y...'],
+  chest:[
+    '..kkkkkkkk..','.kBBBBBBBBk.','kBbbbbbbbbBk','kBbbbbbbbbBk','kkkkkyykkkkk','kBbbbYybbbBk',
+    'kBbbbkkbbbBk','kBbbbbbbbbBk','kkkkkkkkkkkk'],
+};
+function drawSprite(cv, name, scale){
+  const g = SPRITES[name], h = g.length, w = g[0].length;
+  cv.width = w*scale; cv.height = h*scale;
+  const x = cv.getContext('2d');
+  g.forEach((row,j)=>[...row].forEach((ch,i)=>{
+    if(ch==='.') return; x.fillStyle = PAL[ch]; x.fillRect(i*scale,j*scale,scale,scale);
+  }));
+  return cv;
+}
+document.querySelectorAll('canvas[data-sprite]').forEach(c=>drawSprite(c,c.dataset.sprite,+c.dataset.scale));
+
+/* ---------- 지도 위 보물 반짝이 (지도 좌표 기준) ---------- */
+const PINS = [[848,362],[640,300],[560,420],[760,520],[700,250],[880,470]];
+const sparks = document.getElementById('sparks');
+const map = document.getElementById('map');
+PINS.forEach(([x,y],i)=>{
+  const c = drawSprite(document.createElement('canvas'),'spark',3);
+  c.className='spark'; c.style.left=(x-10)+'px'; c.style.top=(y-10)+'px';
+  c.style.animationDelay=(i*.27)+'s';
+  map.appendChild(c);
+});
+
+/* ---------- 픽셀 구름 ---------- */
+const CLOUD = ['....wwww......','..wwwwwwww....','.wwwwwwwwwww..','wwwwwwwwwwwwww','.wwwwwwwwwwww.'];
+SPRITES.cloud = CLOUD;
+const clouds = document.getElementById('clouds');
+[[28,6,38],[180,4,52],[250,5,30]].forEach(([top,scale,dur],i)=>{
+  const c = drawSprite(document.createElement('canvas'),'cloud',scale);
+  c.className='cloud'; c.style.top=top+'px'; c.style.left='0';
+  c.style.animationDuration=dur+'s'; c.style.animationDelay=(-i*13)+'s'; c.style.opacity=.92;
+  clouds.appendChild(c);
+});
+
+/* ---------- 화면 맞춤 ---------- */
+const stage = document.getElementById('stage');
+function fit(){ const s=Math.min(innerWidth/390, innerHeight/844); stage.style.transform=`translate(-50%,-50%) scale(${s})`; }
+addEventListener('resize',fit); fit();
+
+/* ---------- 8bit 효과음 ---------- */
+let ac;
+function beep(notes){
+  try{
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    let t = ac.currentTime;
+    notes.forEach(([f,d])=>{
+      const o=ac.createOscillator(), g=ac.createGain();
+      o.type='square'; o.frequency.value=f; g.gain.value=.06;
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t+d); t+=d;
+    });
+  }catch(e){}
+}
+
+/* ---------- 열린 상자 스프라이트 ---------- */
+SPRITES.chestOpen=[
+  '.kkkkkkkkkk.','kBBBBBBBBBBk','kbbbbbbbbbbk','kkkkkkkkkkkk','kYYwYYYYwYYk','kBYYYYYYYYBk',
+  'kBbbbYybbbBk','kBbbbbbbbbBk','kkkkkkkkkkkk'];
+
+/* ---------- 파티클 엔진 ---------- */
+const fx=document.getElementById('fx'), ctx=fx.getContext('2d');
+fx.width=390; fx.height=844; ctx.imageSmoothingEnabled=false;
+const coinImg=drawSprite(document.createElement('canvas'),'coin',3);
+const COLORS=['#f6b21c','#ffe066','#ffffff','#e8344e','#ff8fa0','#4b1a8c','#1f8a3e','#7ec8f2'];
+let P=[];
+function burst(x,y,n=16,opt={}){
+  for(let k=0;k<n;k++){
+    const a=opt.up? (-Math.PI/2+(Math.random()-.5)*1.4) : Math.random()*Math.PI*2;
+    const sp=(opt.speed||3)+Math.random()*(opt.speed||3);
+    P.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:opt.g??.18,life:opt.life||48+Math.random()*24,age:0,
+            c:COLORS[Math.random()*COLORS.length|0],s:(Math.random()*3|0)+2,coin:opt.coin&&Math.random()<.45,spin:Math.random()*6});
+  }
+}
+function glitter(){ P.push({x:Math.random()*390,y:-6,vx:(Math.random()-.5)*.4,vy:.6+Math.random()*.8,g:0,life:900,age:0,
+  c:Math.random()<.5?'#ffffff':'#ffe066',s:2,tw:true}); }
+// 날아가는 코인 → HUD
+let flyers=[]; let coins=0;
+function flyCoin(x,y){ flyers.push({x,y,sx:x,sy:y,t:0}); }
+function tick(){
+  ctx.clearRect(0,0,390,844);
+  P=P.filter(p=>p.age<p.life && p.y<860);
+  for(const p of P){
+    p.age++; p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.vx*=.985;
+    const fade=1-p.age/p.life; ctx.globalAlpha=p.tw?(p.age%20<10?1:.35):Math.min(1,fade*1.6);
+    const X=Math.round(p.x), Y=Math.round(p.y);
+    if(p.coin){ const w=Math.max(1,Math.abs(Math.cos(p.age/4+p.spin))*24|0); ctx.drawImage(coinImg,X-w/2,Y-12,w,24); }
+    else { ctx.fillStyle=p.c; ctx.fillRect(X,Y,p.s,p.s); if(p.s>3){ctx.fillRect(X-p.s,Y+1,p.s*3,1)} }
+  }
+  ctx.globalAlpha=1;
+  const hud=document.getElementById('hudCoin').getBoundingClientRect(), st=stage.getBoundingClientRect(), sc=st.width/390;
+  const tx=(hud.left-st.left)/sc+8, ty=(hud.top-st.top)/sc+8;
+  flyers=flyers.filter(f=>{
+    f.t+=.045; const t=Math.min(1,f.t), e=t*t*(3-2*t);
+    const x=f.sx+(tx-f.sx)*e, y=f.sy+(ty-f.sy)*e-Math.sin(t*Math.PI)*90;
+    const w=Math.max(2,Math.abs(Math.cos(f.t*10))*24|0); ctx.drawImage(coinImg,Math.round(x-w/2),Math.round(y-12),w,24);
+    if(t>=1){ addCoin(); burst(tx,ty,6,{speed:1.5,life:20}); return false; } return true;
+  });
+  requestAnimationFrame(tick);
+}
+tick(); setInterval(glitter,140);
+function addCoin(n=1){ coins+=n; const el=document.getElementById('coinCount');
+  el.textContent=String(Math.min(coins,999)).padStart(3,'0'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  beep([[1319,.04],[1760,.06]]); }
+
+/* ---------- 좌표 변환 ---------- */
+function local(e){ const r=stage.getBoundingClientRect(), sc=r.width/390; return [(e.clientX-r.left)/sc,(e.clientY-r.top)/sc]; }
+
+/* ---------- 패럴랙스 (마우스·기울기) ---------- */
+const layers=[...document.querySelectorAll('.px')];
+function parallax(nx,ny){ layers.forEach(l=>{ const d=+l.dataset.depth; l.style.transform=`translate(${Math.round(-nx*d)}px,${Math.round(-ny*d)}px)`; }); }
+stage.addEventListener('pointermove',e=>{ const [x,y]=local(e); parallax(x/390-.5,y/844-.5); });
+addEventListener('deviceorientation',e=>{ if(e.gamma==null) return; parallax(Math.max(-1,Math.min(1,e.gamma/30))/2,Math.max(-1,Math.min(1,(e.beta-45)/30))/2); });
+// 손대지 않으면 천천히 흔들림
+let idle=0; setInterval(()=>{ idle+=.05; if(!stage.matches(':hover')) parallax(Math.sin(idle)*.35,Math.cos(idle*.7)*.25); },120);
+
+/* ---------- 오프닝 타임라인 ---------- */
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(r=>setTimeout(r,ms));
+let ready=false;
+async function type(el, html, speed=40){
+  el.classList.add('in'); el.innerHTML='';
+  const tmp=document.createElement('div'); tmp.innerHTML=html;
+  for(const node of tmp.childNodes){
+    const target = node.nodeType===3 ? el : el.appendChild(node.cloneNode(false));
+    const tn=document.createTextNode(''); target.appendChild(tn);
+    for(const ch of node.textContent){ tn.data+=ch; if(ch.trim()&&Math.random()<.5) beep([[440+Math.random()*220,.015]]); await wait(speed); }
+  }
+}
+async function opening(){
+  await wait(1700); $('pre').classList.add('out');
+  $('iris').classList.add('open');
+  await wait(900);
+  $('logo').classList.add('in'); 
+  await wait(560); $('world').classList.add('shake'); burst(195,250,40,{speed:4}); beep([[196,.06],[262,.08]]);
+  await wait(400); $('rays').classList.add('in'); $('shine').classList.add('go');
+  $('title').classList.add('in'); $('hud').style.opacity=1;
+  await wait(260); burst(195,345,24,{speed:3,life:36});
+  await wait(300);
+  $('mascots').classList.add('in');
+  await wait(750); burst(195,620,18,{up:true,speed:3});
+  await type($('bubble'), '안녕! 우리는 가나랜드 친구들이야.<br><b>강화읍</b> 곳곳에 보물이 숨겨져 있대. 같이 찾으러 갈래?');
+  $('start').classList.add('in'); ready=true;
+  if(loadFound().length){   // 저장된 진행이 있으면 이어하기
+    $('start').innerHTML=`이어하기 · ♥${loadFound().length}<span class="tri">▶</span>`;
+    $('tap').innerHTML='<button id="restart" type="button">처음부터 다시 하기</button>'; $('tap').style.opacity=1;
+    $('restart').onclick=e=>{ e.stopPropagation(); if(confirm('모은 퍼즐 조각과 문장이 모두 지워져요. 처음부터 할까요?')){ try{ localStorage.removeItem(KEY); }catch(_){} location.reload(); } };
+  } else $('tap').classList.add('in');
+}
+if(!/q=/.test(location.hash)) opening();
+
+/* ---------- 탭: 반짝이 + 코인 ---------- */
+stage.addEventListener('pointerdown',e=>{
+  if(e.target.closest('#start,#mascots,.screen,#next')) return;
+  const [x,y]=local(e); burst(x,y,18,{speed:2.5,life:34}); beep([[880,.03]]);
+  if(Math.random()<.6) flyCoin(x,y);
+});
+
+/* ---------- 마스코트 반응 ---------- */
+const LINES=['간질간질~ 보물은 저쪽이야!','<b>강화 풍물시장</b> 근처가 수상해…','코인 모으면 좋은 일이 생길지도?','같이 가자! 준비됐지?'];
+let li=0, busy=false;
+$('mascots').addEventListener('pointerdown',async e=>{
+  const m=$('mascots'); m.classList.remove('jump'); void m.offsetWidth; m.classList.add('jump');
+  const [x,y]=local(e); burst(x,y,22,{up:true,speed:3.5,coin:true}); beep([[523,.05],[784,.08]]);
+  setTimeout(()=>m.classList.remove('jump'),620);
+  if(ready && !busy){ busy=true; await type($('bubble'),LINES[li++%LINES.length],30); busy=false; }
+});
+
+
+/* ---------- 시작: 보물상자 피날레 ---------- */
+let started=false;
+$('start').addEventListener('click', async ()=>{
+  if(started) return;
+  if(loadFound().length){   // 이어하기: 바로 지도로
+    started=true; beep([[784,.06],[1047,.12]]);
+    const iris=$('iris'); iris.classList.remove('open'); void iris.offsetWidth; iris.classList.add('close');
+    await wait(900); $('next').style.display='none'; renderMap(); show('mapScr'); toast('저장된 곳부터 이어서 할게요 ✓'); return;
+  }
+  started=true; beep([[988,.08],[1319,.2]]);
+  $('start').style.animation='none'; $('tap').style.visibility='hidden';
+  const chest=drawSprite($('chest'),'chest',12);
+  chest.classList.add('in'); await wait(600);
+  $('world').classList.remove('shake'); void $('world').offsetWidth; $('world').classList.add('shake'); beep([[130,.1]]);
+  chest.classList.remove('in'); chest.style.opacity=1; chest.classList.add('wobble'); beep([[392,.06],[392,.06]]);
+  await wait(1000);
+  drawSprite(chest,'chestOpen',12); $('flash').classList.add('go');
+  beep([[523,.07],[659,.07],[784,.07],[1047,.25]]);
+  for(let k=0;k<5;k++){ burst(195,420,26,{up:true,speed:5,g:.22,coin:true,life:80}); if(k<3) for(let c=0;c<4;c++) setTimeout(()=>flyCoin(170+Math.random()*50,410),c*90); await wait(140); }
+  await wait(900);
+  const iris=$('iris'); iris.classList.remove('open'); void iris.offsetWidth; iris.classList.add('close');
+  await wait(950); $('next').classList.add('in');
+  await wait(1400); ['heroM','heroW'].forEach(id=>$(id).classList.add('idle'));
+});
+
+/* =====================================================================
+   게임 로직: 진행 저장 · 지도 · 스팟 · 봉투 인증 · 편지함
+   ===================================================================== */
+const G=window.GAME, ZONES=G.zones, SPOTS=ZONES.flatMap(z=>z.spots.map(sp=>({...sp,zone:z})));
+const TOTAL=SPOTS.length, KEY='ganaland_found_v1';
+function loadFound(){ try{ return JSON.parse(localStorage.getItem(KEY))||[] }catch(e){ return [] } }
+function saveFound(a){ try{ localStorage.setItem(KEY,JSON.stringify(a)); return true; }catch(e){ return false; } }
+const LV_KEY='ganaland_lv_v1';
+function loadLv(){ try{ return JSON.parse(localStorage.getItem(LV_KEY))||{lv:1,gifts:[]} }catch(e){ return {lv:1,gifts:[]} } }
+let LV=loadLv();
+function saveLv(){ try{ localStorage.setItem(LV_KEY,JSON.stringify(LV)) }catch(e){} }
+const hasGift=k=>LV.gifts.includes(k);
+let toastT=0; function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('on'),2200); }
+let found=loadFound();
+const isFound=id=>found.includes(id);
+const zoneDone=z=>z.spots.every(sp=>isFound(sp.id));
+function zoneOpen(z){ // 최종은 앞 존이 모두 끝나야 열림
+  if(!z.final) return true;
+  return ZONES.filter(x=>!x.final).every(zoneDone);
+}
+// 한 스테이지(스팟)씩 순서대로 공개: 지금 찾을 스팟 = 아직 못 찾은 첫 스팟
+const nextSpot=()=>SPOTS.find(sp=>!isFound(sp.id));
+function curZone(){ const n=nextSpot(); return n ? n.zone : ZONES[ZONES.length-1]; }
+function show(id){ document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('on',el.id===id)); }
+
+/* ---------- 봉투 픽셀 그림 ---------- */
+function drawEnvelope(cv,open){
+  const u=12, Wd=20, Hd=20; cv.width=Wd*u; cv.height=Hd*u;
+  const x=cv.getContext('2d'); x.imageSmoothingEnabled=false; x.clearRect(0,0,cv.width,cv.height);
+  const R=(a,b,w,h,c)=>{x.fillStyle=c;x.fillRect(a*u,b*u,w*u,h*u)};
+  const by=7;
+  if(open){ // 열린 덮개(위로 삼각형)
+    for(let r=0;r<7;r++){ const w=Wd-r*3; if(w<=0)break; const a=(Wd-w)/2; R(a,by-1-r,w,1,'#2b1a14'); if(w>2)R(a+1,by-1-r,w-2,1,'#ffc2cf'); }
+  }
+  R(0,by,Wd,Hd-by,'#2b1a14'); R(1,by+1,Wd-2,Hd-by-2,'#fff3d6');
+  for(let r=0;r<Wd/2;r++){ if(by+1+r>=Hd-1)break; R(1+r,by+1+r,1,1,'#e8c9a2'); R(Wd-2-r,by+1+r,1,1,'#e8c9a2'); }
+  if(!open){
+    for(let r=0;r<9;r++){ const w=Wd-2-r*2; if(w<=0)break; R(1+r,by+1+r,w,1,'#ffd9e0'); }
+    for(let r=0;r<9;r++){ R(1+r,by+1+r,1,1,'#2b1a14'); R(Wd-2-r,by+1+r,1,1,'#2b1a14'); }
+  }
+  // 하트 씰
+  const hx=7, hy=open?by+5:by+7, H=['.rr.rr.','rrRrrrr','rRrrrrr','.rrrrr.','..rrr..','...r...'];
+  H.forEach((row,j)=>[...row].forEach((ch,i)=>{ if(ch!=='.') R(hx+i,hy+j,1,1,ch==='R'?'#ffffff':'#e8344e'); }));
+}
+
+/* ---------- 지도 (기본: 전체 지도 → 존 누르면 스팟 목록) ---------- */
+const MAP_SCALE=.86;   // 전체 지도: 화면 높이를 꽉 채움
+function mapTo(mx,my,sc,visH){   // visH: 보이는 높이(아래 시트 제외) 안에서 (mx,my)를 가운데로
+  const vw=390;
+  let tx=vw/2-mx*sc, ty=visH/2+40-my*sc;
+  tx=Math.min(0,Math.max(vw-944*sc,tx)); ty=Math.min(0,Math.max(visH-996*sc,ty));
+  $('mapInner').style.transform=`translate(${Math.round(tx)}px,${Math.round(ty)}px) scale(${sc})`;
+}
+function renderMap(){
+  const cz=curZone();
+  $('mapStage').textContent= cz.final ? 'FINAL STAGE' : 'STAGE '+cz.stage;
+  $('mapZone').textContent='강화도 보물 지도'; $('mapStage').textContent+=' · 가나·민수 Lv.'+LV.lv;
+  const VIS=ZONES.slice(0,ZONES.indexOf(cz)+1);   // 도달한 존까지만 공개
+  $('mapPath').innerHTML= VIS.length>1 ? `<polyline points="${VIS.map(z=>z.mapPos.join(',')).join(' ')}"/>` : '';
+  $('marks').innerHTML='';
+  VIS.forEach(z=>{
+    const m=document.createElement('div');
+    m.className='zmark'+(z.final?' final':'')+(z===cz?' cur':'');
+    m.style.left=z.mapPos[0]+'px'; m.style.top=z.mapPos[1]+'px';
+    const done=z.spots.filter(sp=>isFound(sp.id)).length;
+    m.innerHTML=`<div class="flag">${z.final?'🏁':'📍'} ${z.name}${done?' ♥'+done:''}</div><div class="pin"></div>`;
+    m.onclick=e=>{ e.stopPropagation(); selectZone(z.id); };
+    $('marks').appendChild(m);
+  });
+  $('duo').style.left=(cz.mapPos[0]-190)+'px'; $('duo').style.top=(cz.mapPos[1]+30)+'px';
+  if(selZone && VIS.some(z=>z.id===selZone)) selectZone(selZone,true); else closeZone();
+}
+let selZone=null;
+function closeZone(){ selZone=null; $('mapScr').classList.remove('zone');
+  const cz=curZone(), V=ZONES.slice(0,ZONES.indexOf(cz)+1), cx=V.reduce((a,z)=>a+z.mapPos[0],0)/V.length, cy=V.reduce((a,z)=>a+z.mapPos[1],0)/V.length;
+  mapTo(cx,cy,MAP_SCALE,844); }
+function selectZone(id,quiet){
+  selZone=id; const z=ZONES.find(z=>z.id===id), nx=nextSpot();
+  $('mapScr').classList.add('zone');
+  mapTo(z.mapPos[0],z.mapPos[1]-70,1.1,414);
+  $('zsStage').textContent= z.final?'FINAL STAGE':'STAGE '+z.stage; $('zsName').textContent=z.name;
+  const L=$('spotList'); L.innerHTML='';
+  z.spots.forEach((sp,i)=>{
+    const f=isFound(sp.id), cur=sp.id===nx?.id, later=!f&&!cur, lock=!sp.ready||later;
+    const c=document.createElement('div'); c.className='scard'+(f?' found':'')+(lock&&!f?' lock':''); c.style.animationDelay=(i*.08)+'s';
+    const title= f||cur ? (sp.ready?(sp.emoji?sp.emoji+' ':'')+sp.name:'???') : '???';
+    const sub= f ? sp.tag : cur ? (sp.ready?sp.tag:'곧 공개돼요') : '앞 보물을 찾으면 열려요';
+    c.innerHTML=`<div class="no">${f?'♥':sp.no}</div><div class="tx"><b>${title}</b><span>${sub}</span></div>
+      <div class="stt">${f?'찾음 ♥':cur&&sp.ready?'찾는 중':'🔒 잠김'}</div>`;
+    if(f||(cur&&sp.ready)) c.onclick=()=>openSpot(sp.id);
+    L.appendChild(c);
+  });
+  if(!quiet) beep([[660,.03],[880,.04]]);
+}
+$('zsClose').onclick=()=>{ closeZone(); beep([[440,.03]]); };
+$('btnBook').onclick=()=>openBook(null);
+$('btnPuzzle').onclick=()=>openPuzzle();
+
+/* ---------- 퍼즐 보기 ---------- */
+function openPuzzle(){
+  drawPuzzle($('pzBoard'),2,haveIdx());
+  const n=haveIdx().length, done=n===TOTAL;
+  $('pzCnt').textContent= done ? '퍼즐 완성! ♥' : `퍼즐 조각 ${n}개를 모았어요`;
+  $('pzFoot').innerHTML = done ? '<button class="pbtn gold" id="pzFinal">최종 편지 열기 ♥</button>' : '';
+  if(done) $('pzFinal').onclick=openFinal;
+  show('puzzleScr');
+}
+$('puzzleBack').onclick=()=>{ renderMap(); show('mapScr'); };
+
+/* ---------- 안내 캐릭터 ---------- */
+const GUIDE_IMG={purple:['guide_purple'],orange:['guide_orange'],both:['guide_orange','guide_purple']};
+function setGuide(el,g){ el.innerHTML=(GUIDE_IMG[g]||GUIDE_IMG.both).map(n=>`<img src="assets/${n}.png" alt="">`).join(''); }
+
+/* ---------- 퍼즐 (7조각, 진짜 퍼즐 모양) ---------- */
+const PZ_W=160, PZ_H=128;
+// 스팟 → 조각 번호는 랜덤(시드 고정이라 폰마다·새로고침해도 같은 조각)
+const PIECE_OF=(()=>{ const a=[0,1,2,3,4,5,6], R=((seed)=>()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; })(9);
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; })();
+const pieceIdx=sp=>PIECE_OF[SPOTS.indexOf(sp)];
+let puzzleSrc=null, srcPx=null, OWN=null, PIECES=[];
+function rng(seed){ return ()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }; }
+function buildOwner(){
+  const R=rng(20261019), ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+  const midY=ri(58,68);
+  const topX=[0,ri(34,44),ri(74,86),ri(114,126),PZ_W];   // 위 4조각
+  const botX=[0,ri(46,60),ri(98,114),PZ_W];              // 아래 3조각
+  OWN=new Int8Array(PZ_W*PZ_H);
+  for(let y=0;y<PZ_H;y++) for(let x=0;x<PZ_W;x++){
+    let o; if(y<midY){ o=0; while(x>=topX[o+1]) o++; } else { o=0; while(x>=botX[o+1]) o++; o+=4; }
+    OWN[y*PZ_W+x]=o;
+  }
+  const knob=(cx,cy,dx,dy,owner)=>{       // 경계 (cx,cy)에서 (dx,dy) 쪽으로 튀어나오는 손잡이
+    const r=6, ox=cx+dx*8, oy=cy+dy*8;
+    for(let y=Math.max(0,oy-r-9);y<=Math.min(PZ_H-1,oy+r+9);y++) for(let x=Math.max(0,ox-r-9);x<=Math.min(PZ_W-1,ox+r+9);x++){
+      const inHead=(x-ox)**2+(y-oy)**2<=r*r;
+      const inNeck= dx ? (Math.abs(y-cy)<=3 && (x-cx)*dx>=0 && (x-cx)*dx<=8) : (Math.abs(x-cx)<=3 && (y-cy)*dy>=0 && (y-cy)*dy<=8);
+      if(inHead||inNeck) OWN[y*PZ_W+x]=owner;
+    }
+  };
+  const ownerAt=(x,y)=>OWN[y*PZ_W+x];
+  for(let i=1;i<4;i++){ const y=ri(18,midY-18), d=R()<.5?-1:1; knob(topX[i],y,d,0,d>0?i-1:i); }
+  for(let i=1;i<3;i++){ const y=ri(midY+18,PZ_H-18), d=R()<.5?-1:1; knob(botX[i],y,d,0,d>0?4+i-1:4+i); }
+  for(let i=0;i<4;i++){
+    let x=((topX[i]+topX[i+1])/2|0)+ri(-4,4);
+    botX.slice(1,3).forEach(bx=>{ if(Math.abs(x-bx)<12) x+= x<bx?-12+(bx-x):12-(x-bx); });
+    const d=R()<.5?-1:1; knob(x,midY,0,d, d>0?i:ownerAt(x,Math.min(PZ_H-1,midY+2)));
+  }
+  PIECES=Array.from({length:7},()=>({x0:PZ_W,y0:PZ_H,x1:0,y1:0,sx:0,sy:0,n:0}));
+  for(let y=0;y<PZ_H;y++) for(let x=0;x<PZ_W;x++){ const P=PIECES[OWN[y*PZ_W+x]];
+    P.x0=Math.min(P.x0,x); P.y0=Math.min(P.y0,y); P.x1=Math.max(P.x1,x); P.y1=Math.max(P.y1,y); P.sx+=x; P.sy+=y; P.n++; }
+  PIECES.forEach(P=>{ P.cx=P.sx/P.n; P.cy=P.sy/P.n; });
+}
+function buildPuzzleSrc(){
+  const c=document.createElement('canvas'); c.width=PZ_W; c.height=PZ_H; const x=c.getContext('2d');
+  x.drawImage(document.getElementById('puzzleImg'),0,0);   // 마스코트 둘 + 주인공 둘
+  puzzleSrc=c; srcPx=x.getImageData(0,0,PZ_W,PZ_H).data;
+  buildOwner();
+}
+const puzzleReady=new Promise(r=>{ const im=document.getElementById('puzzleImg'); if(im.complete&&im.naturalWidth) r(); else im.onload=r; });
+const HEX=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+function isEdge(x,y,o){ return (x>0&&OWN[y*PZ_W+x-1]!==o)||(x<PZ_W-1&&OWN[y*PZ_W+x+1]!==o)||(y>0&&OWN[(y-1)*PZ_W+x]!==o)||(y<PZ_H-1&&OWN[(y+1)*PZ_W+x]!==o); }
+function paint(region,fn){ // region: [x0,y0,w,h] → 작은 캔버스
+  const [x0,y0,w,h]=region, c=document.createElement('canvas'); c.width=w; c.height=h;
+  const cx=c.getContext('2d'), img=cx.createImageData(w,h), d=img.data;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const col=fn(x0+x,y0+y); if(!col) continue; const k=(y*w+x)*4; d[k]=col[0]; d[k+1]=col[1]; d[k+2]=col[2]; d[k+3]=255; }
+  cx.putImageData(img,0,0); return c;
+}
+const C_EMPTY=HEX('#ddd0ee'), C_EMPTY_E=HEX('#b9a8d4'), C_LINE=HEX('#3a1670'), C_GLOW=HEX('#ffe066');
+function drawPuzzle(cv,scale,have,opt={}){
+  if(!puzzleSrc) buildPuzzleSrc();
+  const hide=opt.hide||[];
+  const small=paint([0,0,PZ_W,PZ_H],(x,y)=>{
+    const o=OWN[y*PZ_W+x], got=have.includes(o)&&!hide.includes(o), e=isEdge(x,y,o);
+    if(e) return opt.glow===o ? C_GLOW : got ? C_LINE : C_EMPTY_E;
+    if(got){ const k=(y*PZ_W+x)*4; return [srcPx[k],srcPx[k+1],srcPx[k+2]]; }
+    return C_EMPTY;
+  });
+  cv.width=PZ_W*scale; cv.height=PZ_H*scale; const x=cv.getContext('2d'); x.imageSmoothingEnabled=false;
+  x.drawImage(small,0,0,cv.width,cv.height);
+  x.fillStyle='#9d8bbd'; x.font=`${9*scale}px Galmuri11`; x.textAlign='center'; x.textBaseline='middle';
+  PIECES.forEach((P,i)=>{ if(!have.includes(i)||hide.includes(i)) x.fillText('?',P.cx*scale,P.cy*scale); });
+}
+function drawPiece(cv,i,scale){
+  if(!puzzleSrc) buildPuzzleSrc();
+  const P=PIECES[i], w=P.x1-P.x0+1, h=P.y1-P.y0+1;
+  const small=paint([P.x0,P.y0,w,h],(x,y)=>{ if(OWN[y*PZ_W+x]!==i) return null; if(isEdge(x,y,i)) return C_LINE; const k=(y*PZ_W+x)*4; return [srcPx[k],srcPx[k+1],srcPx[k+2]]; });
+  cv.width=w*scale; cv.height=h*scale; const x=cv.getContext('2d'); x.imageSmoothingEnabled=false; x.drawImage(small,0,0,cv.width,cv.height);
+}
+const haveIdx=()=>SPOTS.filter(sp=>isFound(sp.id)).map(pieceIdx);
+
+/* ---------- 스팟: 대화 장면 ---------- */
+let curSpot=null, vnLines=[], vnI=0, vnTyping=false, vnSkip=false, vnHintSeen=false;
+const josaYa=w=>{ const c=w.charCodeAt(w.length-1); return (c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28) ? '이야' : '야'; };
+const npcOf=k=>(curSpot&&curSpot.npcs||[]).find(n=>n.key===k);
+const GN=g=>{ const n=npcOf(g); if(n) return n.name; return (G.guides&&G.guides[g]&&G.guides[g].name)||(g==='purple'?'별':'승연'); };
+function talkLines(sp){
+  if(isFound(sp.id)){ const w=sp.guide==='both'?'purple':sp.guide;
+    return [{who:w,t:`여기 보물은 이미 찾았어! 고마워 ♥`},{who:sp.guide==='both'?'orange':w,t:'모은 문장은 책에서 다시 볼 수 있어.'}]; }
+  const who=i=> sp.guide==='both' ? (i%2?'purple':'orange') : sp.guide;
+  const raw = sp.talk && sp.talk.length ? sp.talk : (sp.guide==='both' ? [
+      `여기는 ${sp.name}! 이번엔 우리 둘이 같이 안내할게.`,
+      `${sp.zone.final?'마지막 하트 봉투야. 여기까지 와 줘서 고마워!':'이 근처 어딘가에 하트 무늬 봉투를 숨겨 뒀어.'}`,
+      '봉투 안의 비밀 코드를 입력하면 퍼즐 조각이랑 작은 문장을 줄게!',
+      '힌트가 필요하면 말해 줘~'
+    ] : [
+      `안녕! 나는 ${GN(sp.guide)}${josaYa(GN(sp.guide))}. 여기는 ${sp.name}!`,
+      '이 근처 어딘가에 하트 무늬 봉투를 숨겨 뒀어.',
+      '봉투 안의 비밀 코드를 입력하면 퍼즐 조각이랑 작은 문장을 줄게!',
+      '힌트가 필요하면 말해 줘~'
+    ]);
+  return raw.map((t,i)=>({who:who(i),t}));
+}
+function setChars(sp){
+  const el=$('vnChars');
+  if(sp.npcs&&sp.npcs.length){   // NPC 는 왼쪽, 안내 캐릭터는 오른쪽
+    const g= sp.guide==='both' ? ['orange','purple'] : [sp.guide];
+    el.innerHTML = sp.npcs.map((n,i)=>{
+        const st=`left:${n.x!=null?n.x:8+i*80}px`;
+        if(n.anim==='drink') return `<div class="ch npc drink" style="${st}" data-who="${n.key}"></div>`;
+        if(n.anim==='wag') return `<div class="ch npc wag${n.small?' small':''}" style="${st}" data-who="${n.key}"><img src="assets/${n.img}_body.png" alt=""><img class="tail" src="assets/${n.img}_tail.png" alt=""></div>`;
+        return `<img class="ch npc${n.small?' small':''}" style="${st}" data-who="${n.key}" src="assets/${n.img}.png" alt="">`;
+      }).join('')
+      + g.map((k,i)=>`<img class="ch gd" style="right:${6+(g.length-1-i)*92}px" data-who="${k}" src="assets/guide_${k}.png" alt="">`).join('')
+      + '<img class="ch pc gone" style="right:118px" data-who="minsu" src="assets/hero_m.png" alt="민수">'
+      + '<img class="ch pc gone" style="right:14px" data-who="gana" src="assets/hero_w.png" alt="가나">';   // 가이드 퇴장 후 등장
+    return;
+  }
+  el.innerHTML = sp.guide==='both'
+    ? '<img class="ch l" data-who="orange" src="assets/guide_orange.png" alt=""><img class="ch r" data-who="purple" src="assets/guide_purple.png" alt="">'
+    : `<img class="ch solo" data-who="${sp.guide}" src="assets/guide_${sp.guide}.png" alt="">`;
+}
+function speaker(who){
+  $('vnName').textContent= who==='both' ? GN('purple')+' & '+GN('orange') : GN(who); $('vnName').className= npcOf(who)?'npc':who;
+  document.querySelectorAll('#vnChars .ch').forEach(im=>{ const me=who==='both'||im.dataset.who===who; im.classList.toggle('dim',!me); im.classList.toggle('talk',me); });
+}
+const GUIDES=['purple','orange','both'];
+function enterFree(){
+  const S=$('spotScr'); S.classList.add('free');
+  document.querySelectorAll('#vnChars .gd,#vnChars .solo,#vnChars .l,#vnChars .r').forEach(e=>e.classList.add('gone'));
+  document.querySelectorAll('#vnChars .pc').forEach((e,i)=>setTimeout(()=>e.classList.remove('gone'),250+i*180));   // 민수·가나 입장
+  document.querySelectorAll('#vnChars .ch').forEach(e=>e.classList.remove('dim','talk'));
+}
+let freePending=false;
+async function vnSay(line){
+  const S=$('spotScr');
+  if(S.classList.contains('free')){ S.classList.remove('free');
+    if(GUIDES.includes(line.who)){
+      document.querySelectorAll('#vnChars .pc').forEach(e=>e.classList.add('gone'));   // 가이드가 말하면 민수·가나는 잠깐 비켜 줌
+      document.querySelectorAll('#vnChars .gone:not(.pc)').forEach(e=>{ if(line.who==='both'||e.dataset.who===line.who) e.classList.remove('gone'); }); } }
+  speaker(line.who); const box=$('vnBox'), tx=$('vnText');
+  box.classList.remove('wait'); tx.textContent=''; vnTyping=true; vnSkip=false;
+  for(const ch of line.t){ if(vnSkip){ tx.textContent=line.t; break; } tx.textContent+=ch; if(ch.trim()&&Math.random()<.4) beep([[520+Math.random()*160,.012]]); await wait(38); }
+  vnTyping=false;
+  document.querySelectorAll('#vnChars .ch').forEach(im=>im.classList.remove('talk'));
+}
+function waitTap(){ $('vnBox').classList.add('wait'); return new Promise(r=>{ const f=()=>{ $('vnBox').removeEventListener('click',f); $('vnBox').classList.remove('wait'); r(); }; setTimeout(()=>$('vnBox').addEventListener('click',f),50); }); }
+async function vnNext(){
+  if(vnTyping){ vnSkip=true; return; }
+  if(freePending){ freePending=false; $('vnBox').classList.remove('wait'); enterFree(); beep([[523,.04],[392,.06]]); vnMenu(); return; }
+  if(vnI>=vnLines.length) return;
+  if(vnI<vnLines.length){ const l=vnLines[vnI++]; $('vnChoices').innerHTML=''; await vnSay(l);
+    if(vnI<vnLines.length) $('vnBox').classList.add('wait');
+    else if(curSpot&&curSpot.npcs&&!introMode&&!isFound(curSpot.id)){ freePending=true; $('vnBox').classList.add('wait'); }
+    else vnMenu(); }
+}
+let introMode=false;
+function vnMenu(){
+  const sp=curSpot, C=$('vnChoices'); C.innerHTML='';
+  const btn=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='pbtn '+cls; b.innerHTML=label; b.onclick=e=>{ e.stopPropagation(); fn(b); }; C.appendChild(b); return b; };
+  if(introMode){ btn('🗺️ 보물 지도 열기','gold wide',()=>{ introMode=false; renderMap(); show('mapScr'); }); return; }
+  if(isFound(sp.id)){
+    btn('책 보기','gold',()=>openBook(null)); btn('지도로','ghost',()=>show('mapScr')); return;
+  }
+  btn('🎉 보물을 찾았다!!','gold wide',()=>{   // → 봉투 속 비밀 코드 입력
+    C.innerHTML=''; $('codeMsg').textContent='';
+    $('codeRow').classList.add('on'); $('codeIn').value=''; $('codeIn').focus();
+    btn('◀ 돌아가기','ghost wide',()=>{ $('codeRow').classList.remove('on'); $('codeMsg').textContent=''; vnMenu(); });
+  });
+  (sp.npcs||[]).forEach(n=>btn(`💬 ${n.name}`,'ghost',async()=>{
+    C.innerHTML='';
+    for(const t of n.talk||[]){ await vnSay({who:n.key,t}); await waitTap(); }
+    if(n.gift && !hasGift(sp.id+':'+n.key)){ await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
+    enterFree(); vnMenu();
+  }));
+  const h=btn(vnHintSeen?'힌트 다시 듣기':'💡 힌트 보기','',async()=>{
+    vnHintSeen=true; C.innerHTML='';
+    const w= sp.hintBy || (sp.guide==='both' ? 'purple' : sp.guide);
+    await vnSay({who:w,t: npcOf(w) ? '(살금살금 다가와서 속삭인다)' : '힌트는 딱 하나야. 잘 들어!'}); await wait(500);
+    const H=Array.isArray(sp.hint)?sp.hint:[sp.hint||'음… 힌트는 아직 비밀이야!'];
+    for(let i=0;i<H.length;i++){ await vnSay({who:w,t:H[i]}); if(i<H.length-1) await waitTap(); }
+    if(sp.npcs&&sp.npcs.length){ await waitTap(); enterFree(); }
+    vnMenu();
+  });
+}
+function setBg(bg,pos){
+  const el=$('vnBg');
+  if(bg){ el.className='pic'; el.style.backgroundImage=`url(assets/${bg}.png)`; el.style.transform=''; }
+  else { el.className=''; el.style.backgroundImage=''; const sc=1.1; el.style.transform=`translate(${Math.round(195-pos[0]*sc)}px,${Math.round(300-pos[1]*sc)}px) scale(${sc})`; }
+}
+function openIntro(){
+  introMode=true; curSpot=null;
+  $('spotLbl').textContent='WELCOME'; $('spotName').textContent='가나랜드 보물찾기'; $('spotAddr').textContent='강화도 · 온수리 → 강화읍';
+  setBg(null,[760,560]);
+  setChars({guide:'both'});
+  $('codeRow').classList.remove('on'); $('codeMsg').textContent=''; $('vnChoices').innerHTML=''; $('vnText').textContent='';
+  vnLines=(G.intro||[]).map(l=>({who:l.who,t:l.t})); vnI=0;
+  show('spotScr'); setTimeout(vnNext,450);
+}
+function openSpot(id){
+  introMode=false;
+  const sp=SPOTS.find(s=>s.id===id); curSpot=sp; vnHintSeen=false;
+  $('spotLbl').textContent=(sp.zone.final?'FINAL':'SPOT '+sp.no)+' · '+sp.zone.name;
+  $('spotName').textContent=(sp.emoji?sp.emoji+' ':'')+sp.name;
+  $('spotAddr').textContent=sp.addr||sp.zone.sub;
+  // 배경: 지도에서 그 존 근처를 크게
+  setBg(sp.bg, sp.zone.mapPos);
+  $('spotScr').classList.remove('free'); freePending=false;
+  setChars(sp);
+  $('codeIn').value=''; $('codeMsg').textContent=''; $('codeRow').classList.remove('on');
+  $('vnChoices').innerHTML=''; $('vnText').textContent='';
+  vnLines=talkLines(sp); vnI=0;
+  show('spotScr');
+  setTimeout(vnNext,450);
+}
+$('vnBox').addEventListener('click',vnNext);
+$('spotX').onclick=()=>{ introMode=false; renderMap(); show('mapScr'); };
+$('codeGo').onclick=async()=>{
+  const v=normCode($('codeIn').value);
+  const sp=await findSpotByCode(v);
+  if(sp){ await unlockSpot(sp,v); await unlockSaved(); }
+  if(!sp || !sp.ready){ $('codeMsg').textContent='앗, 코드가 달라! 봉투를 다시 확인해 줘.'; const r=$('codeRow'); r.classList.remove('shake'); void r.offsetWidth; r.classList.add('shake'); beep([[180,.12]]); return; }
+  claim(sp);
+};
+$('codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter') $('codeGo').click(); });
+
+
+/* ---------- 선물 → 가나·민수 살짝 취함 + 레벨업 ---------- */
+async function giftScene(sp,n){
+  const g=n.gift, S=$('giftScr'); S.className='screen on';
+  $('giftEmoji').textContent=g.emoji||'🎁'; const jc=g.item.charCodeAt(g.item.length-1), has=(jc>=0xAC00&&jc<=0xD7A3&&(jc-0xAC00)%28); $('giftTx').textContent=`${g.item}${has?'을':'를'} 받았다!`;
+  $('giftMood').textContent=''; $('lvStats').innerHTML=g.stats||'기분 <em>■■■■■</em> MAX<br>용기 <em>+1</em> · 보물 감각 <em>+1</em>'; $('lvFrom').textContent='Lv.'+LV.lv; $('lvTo').textContent='Lv.'+(LV.lv+1);
+  beep([[523,.06],[659,.06],[784,.12]]);
+  await wait(1300); S.classList.add('drink'); beep([[392,.08],[330,.08],[392,.12]]);
+  for(let k=0;k<6;k++){ burst(150+Math.random()*90,520,6,{up:true,speed:2,g:-.02,life:60}); await wait(160); }
+  $('giftFloat').textContent=g.emoji||'';
+  S.classList.add(g.effect||'tipsy');
+  if(g.effect==='bless'){ beep([[1568,.08],[1319,.08],[1568,.2]]); for(let k=0;k<4;k++){ burst(195,430,22,{speed:3,life:50}); await wait(200); } }
+  if(g.effect==='wish'){ beep([[659,.1],[784,.1],[988,.25]]); for(let k=0;k<5;k++){ burst(195,300-k*40,10,{speed:1.5,life:40}); await wait(220); } }
+  await type($('giftMood'), g.mood || '가나·민수가 살짝 취했다~ 헤헤<br>기분이 아주 좋아졌다! ♪', 45);
+  await wait(900);
+  S.classList.add('lvup'); $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+  beep([[523,.07],[659,.07],[784,.07],[1047,.1],[784,.07],[1047,.3]]);
+  for(let k=0;k<5;k++){ burst(195,250,30,{speed:5}); await wait(130); }
+  LV.lv+=1; LV.gifts.push(sp.id+':'+n.key); saveLv();
+  await new Promise(r=>{ $('giftOk').onclick=()=>{ S.className='screen'; show('spotScr'); r(); }; });
+}
+
+/* ---------- 카메라로 QR 찍기 ---------- */
+let camStream=null, camLoop=0, camBusy=false, detector=null;
+const normCode=t=>String(t).replace(/[\s?!.,~'"·…]+/g,'').toLowerCase();   // 공백·문장부호 무시
+/* ---------- 코드 잠금 (공개 빌드: codeHash + 암호문 / 로컬: 원문 code) ---------- */
+const CODE_KEY='ganaland_codes_v1';
+let CODES=(()=>{ try{ return JSON.parse(localStorage.getItem(CODE_KEY))||{} }catch(e){ return {} } })();
+function saveCodes(){ try{ localStorage.setItem(CODE_KEY,JSON.stringify(CODES)) }catch(e){} }
+const TE=new TextEncoder();
+async function sha256(str){ return new Uint8Array(await crypto.subtle.digest('SHA-256',TE.encode(str))); }
+const toHex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function decryptWith(keyStr,b64){
+  const raw=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  const key=await crypto.subtle.importKey('raw',await sha256(keyStr),'AES-GCM',false,['decrypt']);
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},key,raw.slice(12));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function findSpotByCode(n){
+  if(!n) return null;
+  const h= SPOTS.some(s=>s.codeHash) ? toHex(await sha256('ganaland-check|'+n)) : null;
+  return SPOTS.find(s=>s.ready && (s.code!=null ? normCode(s.code)===n : s.codeHash===h)) || null;
+}
+async function unlockSpot(sp,n){
+  if(sp.enc && sp.sentence==null){ try{ const d=await decryptWith('ganaland|'+n,sp.enc); sp.sentence=d.sentence; sp.from=d.from; }catch(e){} }
+  CODES[sp.id]=n; saveCodes();
+}
+async function unlockSaved(){
+  for(const sp of SPOTS){ const n=CODES[sp.id]; if(n&&sp.enc&&sp.sentence==null){ try{ const d=await decryptWith('ganaland|'+n,sp.enc); sp.sentence=d.sentence; sp.from=d.from; }catch(e){} } }
+  if(G.finalEnc && !G.finalLetter && SPOTS.every(s=>CODES[s.id])){
+    try{ G.finalLetter=await decryptWith('ganaland|final|'+SPOTS.map(s=>CODES[s.id]).join('|'),G.finalEnc); }catch(e){} }
+}
+const unlockReady=unlockSaved();
+const sentOf=sp=>sp.sentence!=null ? sp.sentence : '🔒 (이 봉투 코드를 다시 입력하면 보여요)';
+function codeFromText(t){ const m=String(t).match(/[#?&]q=([^&#]+)/); let c=m?m[1]:String(t); try{ c=decodeURIComponent(c); }catch(e){} c=normCode(c); return SPOTS.find(s=>normCode(s.code)===c&&s.ready); }
+async function openCam(){
+  setGuide($('camGuide'), curSpot ? (curSpot.guide==='both'?'purple':curSpot.guide) : 'purple');
+  $('camMsg').textContent='하트 봉투 속 QR을 네모 안에 맞춰 줘!'; $('camScr').classList.remove('hit');
+  show('camScr'); camBusy=false;
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    const v=$('camVideo'); v.srcObject=camStream; await v.play();
+    if('BarcodeDetector' in window){ try{ detector=new BarcodeDetector({formats:['qr_code']}); }catch(e){ detector=null; } }
+    scanTick();
+  }catch(e){
+    $('camMsg').textContent='카메라를 열 수 없어. 카메라 권한을 허용하거나, 봉투에 적힌 코드를 입력해 줘!';
+  }
+}
+const scanCv=document.createElement('canvas'), scanX=scanCv.getContext('2d',{willReadFrequently:true});
+async function scanTick(){
+  if(!camStream) return;
+  const v=$('camVideo');
+  if(v.readyState>=2 && !camBusy){
+    camBusy=true; let text=null;
+    try{
+      if(detector){ const r=await detector.detect(v); if(r.length) text=r[0].rawValue; }
+      else if(window.jsQR){ const w=480, h=Math.round(v.videoHeight/v.videoWidth*480)||480; scanCv.width=w; scanCv.height=h;
+        scanX.drawImage(v,0,0,w,h); const r=jsQR(scanX.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'}); if(r) text=r.data; }
+    }catch(e){}
+    camBusy=false;
+    if(text){
+      const sp=codeFromText(text);
+      if(sp){ $('camScr').classList.add('hit'); $('camMsg').textContent='찾았다! ♥'; beep([[988,.06],[1319,.12]]); await wait(500); closeCam(); claim(sp); return; }
+      $('camMsg').textContent='음, 이건 가나랜드 QR이 아닌 것 같아. 하트 봉투 속 QR을 찍어 줘!';
+    }
+  }
+  camLoop=requestAnimationFrame(scanTick);
+}
+function closeCam(){ cancelAnimationFrame(camLoop); if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; } }
+$('camCancel').onclick=()=>{ closeCam(); show(curSpot?'spotScr':'mapScr'); };
+
+/* ---------- 봉투 발견: 퍼즐 조각 + 작은 문장 ---------- */
+let lastSpot=null, lastFirst=false;
+async function claim(sp){
+  const first=!isFound(sp.id);
+  if(first){ found.push(sp.id); if(!saveFound(found)) toast('⚠ 저장이 안 돼요 (비공개 모드?)'); }
+  lastSpot=sp; lastFirst=first;
+  show('foundScr');
+  const env=$('env'), paper=$('paper'), stamp=$('stamp'), foot=$('foundFoot');
+  ['drop','wob'].forEach(c=>env.classList.remove(c)); paper.classList.remove('up'); stamp.classList.remove('hit'); foot.classList.remove('in'); $('foundScr').classList.remove('lit');
+  document.querySelectorAll('.got').forEach(g=>g.classList.remove('pop'));
+  env.style.opacity=0; $('paperTxt').textContent='';
+  $('foundK').textContent= sp.zone.final ? 'FINAL TREASURE' : 'TREASURE FOUND · '+sp.zone.name;
+  $('foundName').textContent=sp.name;
+  await puzzleReady; drawPiece($('pieceCv'),pieceIdx(sp),2); $('pieceTx').textContent='퍼즐 조각';
+  drawEnvelope(env,false);
+  await wait(250);
+  env.classList.add('drop'); beep([[262,.05],[330,.05]]); await wait(620);
+  env.classList.remove('drop'); env.style.opacity=1; env.classList.add('wob'); beep([[392,.05],[392,.05],[392,.05]]); await wait(1250);
+  drawEnvelope(env,true); $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+  $('foundScr').classList.add('lit');
+  beep([[523,.07],[659,.07],[784,.07],[1047,.25]]);
+  for(let k=0;k<4;k++){ burst(195,330,26,{up:true,speed:5,g:.2,life:70}); await wait(120); }
+  paper.classList.add('up'); await wait(720);
+  stamp.classList.add('hit'); beep([[150,.08]]);
+  await wait(250);
+  $('gotPiece').classList.add('pop'); beep([[880,.05],[1175,.08]]); burst(130,330,14,{speed:2.5,life:30}); await wait(380);
+  $('gotSent').classList.add('pop'); beep([[988,.05],[1319,.08]]); burst(260,330,14,{speed:2.5,life:30}); await wait(400);
+  await type($('paperTxt'), escapeHtml(sentOf(sp))+(sp.from?`<br><small class="from">— ${escapeHtml(sp.from)}</small>`:''), 40);
+  const n=haveIdx().length;
+  $('foundCnt').textContent= `퍼즐 조각 ${n}개 모았어요` + (first?' · 저장됨 ✓':' · 이미 찾은 봉투예요');
+  $('foundGo').textContent='책에 담기 ▶';
+  foot.classList.add('in');
+}
+$('foundGo').onclick=()=>openBook(lastFirst?lastSpot:null);
+function escapeHtml(t){ return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- 문장 책 (한 줄씩 쌓임) ---------- */
+async function openBook(newSp){
+  const guideSp=newSp||lastSpot||SPOTS.find(sp=>isFound(sp.id))||SPOTS[0];
+  setGuide($('bookGuide'),guideSp.guide);
+  $('bookTtl').textContent=G.bookTitle||'우리가 모은 작은 문장들';
+  const got=SPOTS.filter(sp=>isFound(sp.id));
+  $('bookBubble').textContent= got.length ? '우리가 수집한 작은 문장들이야~' : '아직 빈 책이야. 하트 봉투를 찾아 줘!';
+  const L=$('bookLines'); L.innerHTML='';
+  const add=(sp,isNew)=>{ const d=document.createElement('div'); d.className='bline'+(isNew?' new':''); d.innerHTML=`<i>${String(sp.no).padStart(2,'0')}</i><span>${escapeHtml(sentOf(sp))}${sp.from?`<small class="from">— ${escapeHtml(sp.from)}</small>`:''}</span>`; L.appendChild(d); return d; };
+  got.filter(sp=>sp!==newSp).forEach(sp=>add(sp,false));
+  const complete=haveIdx().length===TOTAL;
+  $('bookCnt').textContent=`퍼즐 조각 ${haveIdx().length}개`+(complete?' · 다 모았어!':'');
+  $('bookGo').textContent= complete ? '최종 편지 열기 ♥' : '지도로 ▶';
+  drawPuzzle($('miniPuzzle'),1,haveIdx(),{hide:newSp?[pieceIdx(newSp)]:[]});
+  show('bookScr');
+  $('book').scrollTop=$('book').scrollHeight;
+  if(newSp){
+    await wait(700);
+    const d=add(newSp,true); $('book').scrollTop=$('book').scrollHeight;
+    beep([[659,.05],[784,.05],[988,.1]]);
+    const r=d.getBoundingClientRect(), st=stage.getBoundingClientRect(), sc=st.width/390;
+    burst((r.left-st.left)/sc+60,(r.top-st.top)/sc+14,18,{speed:2.5,life:34});
+    await wait(700);
+    drawPuzzle($('miniPuzzle'),1,haveIdx(),{glow:pieceIdx(newSp)}); beep([[523,.05],[1047,.1]]);
+    burst(70,770,16,{up:true,speed:3});
+    if(complete){ await wait(500); $('bookBubble').textContent='퍼즐을 다 모았어! 우리가 준비한 편지가 있어 ♥'; }
+  }
+}
+$('bookGo').onclick=()=>{ if(haveIdx().length===TOTAL) openFinal(); else { renderMap(); show('mapScr'); } };
+
+/* ---------- 최종 편지 ---------- */
+async function openFinal(){
+  await unlockReady; await unlockSaved();
+  if(!G.finalLetter){ toast('편지를 열려면 모든 봉투 코드가 필요해요'); return; }
+  const F=$('finalScr'); F.className='screen';
+  $('flTtl').textContent=G.finalLetter.title||''; $('flBody').textContent=''; $('flSign').textContent='';
+  show('finalScr');
+  const cv=$('bigPuzzle'); const have=[];
+  drawPuzzle(cv,2,have);
+  for(let i=0;i<TOTAL;i++){ await wait(240); have.push(i); drawPuzzle(cv,2,have,{glow:i}); beep([[440+i*70,.06]]);
+    burst(35+PIECES[i].cx*2,100+PIECES[i].cy*2,10,{speed:2,life:26}); }
+  await wait(300); drawPuzzle(cv,2,have); $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+  beep([[523,.08],[659,.08],[784,.08],[1047,.3]]);
+  for(let k=0;k<5;k++){ burst(195,230,30,{speed:5,coin:k%2===0}); await wait(120); }
+  await wait(500); F.classList.add('duo'); beep([[392,.06],[523,.1]]);
+  await wait(1800); F.classList.add('lettered'); beep([[784,.06],[988,.1]]);
+  await wait(800);
+  for(const line of G.finalLetter.body){ const sp=document.createElement('div'); $('flBody').appendChild(sp);
+    for(const ch of line){ sp.textContent+=ch; await wait(60); } }
+  $('flSign').textContent=G.finalLetter.sign||'';
+  for(let k=0;k<3;k++){ burst(195,300,26,{speed:4}); await wait(150); }
+  F.classList.add('end');
+}
+$('finalBook').onclick=()=>openBook(null);
+
+/* ---------- 오프닝 → 지도 ---------- */
+$('goMap').onclick=()=>{ beep([[784,.06],[1047,.12]]); $('next').style.display='none'; openIntro(); };
+
+/* ---------- QR 진입 (#q=코드) ---------- */
+(function routeQR(){
+  if(!/q=/.test(location.hash)) return;
+  const m=location.hash.match(/q=([^&#]+)/); let c=m?m[1]:''; try{ c=decodeURIComponent(c); }catch(e){}
+  history.replaceState(null,'',location.pathname+location.search);
+  started=true; ['pre','iris','next'].forEach(id=>$(id).style.display='none');   // 오프닝 건너뛰고 바로 봉투 연출
+  (async()=>{ const n=normCode(c), sp=await findSpotByCode(n); if(!sp){ renderMap(); show('mapScr'); return; } await unlockSpot(sp,n); await unlockSaved(); claim(sp); })();
+})();
+</script>
+</body>
+</html>
