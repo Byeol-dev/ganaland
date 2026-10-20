@@ -700,7 +700,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgssor4"></script>
+<script src="data.js?v=mvgstqc1"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1545,7 +1545,17 @@ async function openFinal(){
   for(let k=0;k<3;k++){ burst(195,300,26,{speed:4}); await wait(150); }
   F.classList.add('end');
 }
-$('finalBook').onclick=()=>openBook(null);
+$('finalBook').onclick=async()=>{   // 별·승연이 한 번 더 인사하고 책으로
+  const F=$('finalScr'), B=$('finalBubble');
+  F.classList.remove('end','lettered'); F.classList.add('duo');
+  B.textContent='모은 문장은 책에서 다시 볼 수 있어~'; beep([[659,.05],[784,.08]]);
+  await wait(2000);
+  B.textContent='오늘 정말 생일 축하해! 🎂';
+  beep([[523,.12],[523,.12],[587,.25],[523,.25],[698,.25],[659,.5]]);
+  for(let k=0;k<6;k++){ burst(60+Math.random()*270,300+Math.random()*250,28,{up:true,speed:5,coin:k%2===0}); await wait(200); }
+  await wait(1600);
+  B.textContent='우리가 주는 편지야! 열어 봐 ♥'; openBook(null);
+};
 
 /* ---------- 그림 미리 받아 두기 (느린 망에서 배경 빈칸 방지) ---------- */
 (function preload(){
