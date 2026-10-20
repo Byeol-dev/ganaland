@@ -420,7 +420,7 @@
   #camCancel{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:160px}
 
   /* ===================== 지도 (기본 = 전체 지도) ===================== */
-  #mapView{height:844px !important}
+  #mapView{height:100% !important}
   #mapBtns{display:flex;gap:8px}
   .mbtn{width:54px;height:54px;border:0;cursor:pointer;font-size:20px;line-height:1;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
         box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 7px 0 rgba(43,26,20,.18)}
@@ -574,6 +574,43 @@
   @keyframes giftBounce{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-10px) rotate(4deg)}}
   #flBody{font-size:17px;text-align:center}
   #flSign{text-align:center}
+
+  /* ===== 낮은 화면(카톡 인앱 등) 배치 ===== */
+  #zoneSheet{height:min(430px,56%) !important}
+  #stage.short #logoWrap{top:10px;transform:scale(.74);transform-origin:50% 0}
+  #stage.short #rays{top:120px}
+  #stage.short #title{top:196px}
+  #stage.short #bubble{top:272px}
+  #stage.short #mascots{width:236px;margin-left:-118px;bottom:118px}
+  #stage.short #start{bottom:46px}
+  #stage.short #tap{bottom:16px}
+  #stage.tiny #mascots{width:200px;margin-left:-100px;bottom:112px}
+  #stage.short #giftTop{top:56px}
+  #stage.short #giftDuo{top:250px}
+  #stage.short #giftBub{top:250px}
+  #stage.short .hb img{height:190px}
+  #stage.short #giftMood{top:auto;bottom:40px}
+  #stage.short #lvBox{top:70px}
+  #stage.short #giftScr.lvup #giftDuo,#stage.short #giftScr.lvup #giftBub{top:auto;bottom:24px}
+  #stage.short #giftScr.lvup .hb img{height:160px}
+  #stage.short #env{top:140px}
+  #stage.short #paper{top:170px}
+  #stage.short #foundHead{top:40px}
+  #stage.short #foundFoot{bottom:28px}
+  #stage.short #heroes{height:200px;margin:10px auto}
+  #stage.short #heroM{width:116px;height:204px}
+  #stage.short #heroW{width:116px;height:186px}
+  #stage.short #bigPuzzle{top:80px}
+  #stage.short #finalLetter{top:120px;bottom:150px}
+  #stage.short #finalDuo img{height:120px}
+  #stage.short #finalBubble{bottom:150px}
+  #stage.short #book{top:132px;bottom:132px}
+  #stage.short #bookHead{height:110px}
+  #stage.short #bookGuide img{height:104px}
+  #stage.short #bookFoot{bottom:14px}
+  #stage.short #vnChars img.solo{height:290px}
+  #stage.short #vnChars img.l{height:240px} #stage.short #vnChars img.r{height:256px}
+  #codeIn{font-size:17px}
 </style>
 </head>
 <body>
@@ -700,7 +737,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgstx11"></script>
+<script src="data.js?v=mvgta25z"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -756,11 +793,22 @@ const stage = document.getElementById('stage');
 function fit(){
   const vv=window.visualViewport, W=Math.min(innerWidth, vv?vv.width:innerWidth, document.documentElement.clientWidth||innerWidth),
         H=Math.min(innerHeight, vv?vv.height:innerHeight, document.documentElement.clientHeight||innerHeight);
-  const s=Math.min(W/390, H/844);
+  const typing=document.activeElement&&document.activeElement.tagName==='INPUT';
+  if(typing && window._fitS){   // 키보드가 떠 있을 땐 크기 유지, 화면 아래쪽(입력칸)만 키보드 위로
+    const s0=window._fitS, sh0=window.SH;
+    stage.style.top=((vv?vv.offsetTop:0)+H-sh0*s0/2)+'px';
+    stage.style.transform=`translate(-50%,-50%) scale(${s0})`; return;
+  }
+  let s=W/390, sh=H/s;
+  if(sh>844){ sh=844; s=Math.min(W/390,H/844); } else if(sh<640){ sh=640; s=H/640; }
+  window._fitS=s;
+  window.SH=sh; stage.style.height=sh+'px'; stage.classList.toggle('short', sh<770); stage.classList.toggle('tiny', sh<700);
   stage.style.top=((vv?vv.offsetTop:0)+H/2)+'px';
   stage.style.transform=`translate(-50%,-50%) scale(${s})`;
 }
 if(window.visualViewport){ visualViewport.addEventListener('resize',fit); visualViewport.addEventListener('scroll',fit); }
+addEventListener('focusin',e=>{ if(e.target.tagName==='INPUT'){ setTimeout(fit,50); setTimeout(fit,350); } });
+addEventListener('focusout',e=>{ if(e.target.tagName==='INPUT'){ setTimeout(()=>{ scrollTo(0,0); fit(); },120); } });
 addEventListener('orientationchange',()=>setTimeout(fit,300));
 // 화면 상자가 안쪽으로 스크롤돼 밀리는 것 방지
 ['stage','mapView'].forEach(id=>{ const el=document.getElementById(id); el.addEventListener('scroll',()=>{ if(el.scrollLeft||el.scrollTop){ el.scrollLeft=0; el.scrollTop=0; } }); });
@@ -768,9 +816,19 @@ addEventListener('resize',fit); fit();
 
 /* ---------- 8bit 효과음 ---------- */
 let ac;
+function audioOn(){
+  try{
+    if(navigator.audioSession) navigator.audioSession.type='playback';   // 아이폰 무음 스위치여도 효과음
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state!=='running') ac.resume();
+    const b=ac.createBuffer(1,1,22050), src=ac.createBufferSource(); src.buffer=b; src.connect(ac.destination); src.start(0);
+  }catch(e){}
+}
+['pointerdown','touchend','click','keydown'].forEach(ev=>addEventListener(ev,audioOn,{passive:true}));
 function beep(notes){
   try{
     ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state!=='running') ac.resume();
     let t = ac.currentTime;
     notes.forEach(([f,d])=>{
       const o=ac.createOscillator(), g=ac.createGain();
@@ -836,7 +894,7 @@ function local(e){ const r=stage.getBoundingClientRect(), sc=r.width/390; return
 /* ---------- 패럴랙스 (마우스·기울기) ---------- */
 const layers=[...document.querySelectorAll('.px')];
 function parallax(nx,ny){ layers.forEach(l=>{ const d=+l.dataset.depth; l.style.transform=`translate(${Math.round(-nx*d)}px,${Math.round(-ny*d)}px)`; }); }
-stage.addEventListener('pointermove',e=>{ const [x,y]=local(e); parallax(x/390-.5,y/844-.5); });
+stage.addEventListener('pointermove',e=>{ const [x,y]=local(e); parallax(x/390-.5,y/(window.SH||844)-.5); });
 addEventListener('deviceorientation',e=>{ if(e.gamma==null) return; parallax(Math.max(-1,Math.min(1,e.gamma/30))/2,Math.max(-1,Math.min(1,(e.beta-45)/30))/2); });
 // 손대지 않으면 천천히 흔들림
 let idle=0; setInterval(()=>{ idle+=.05; if(!stage.matches(':hover')) parallax(Math.sin(idle)*.35,Math.cos(idle*.7)*.25); },120);
@@ -1033,11 +1091,11 @@ async function travel(from,to){
 let selZone=null;
 function closeZone(){ selZone=null; $('mapScr').classList.remove('zone'); $('duo').classList.remove('mini','away'); if(!travelling) placeDuo(curZone());
   const cz=curZone(), V=ZONES.slice(0,ZONES.indexOf(cz)+1), cx=V.reduce((a,z)=>a+z.mapPos[0],0)/V.length, cy=V.reduce((a,z)=>a+z.mapPos[1],0)/V.length;
-  mapTo(cx,cy,MAP_SCALE,844); }
+  mapTo(cx,cy,MAP_SCALE,window.SH||844); }
 function selectZone(id,quiet){
   selZone=id; const z=ZONES.find(z=>z.id===id), nx=nextSpot();
   $('mapScr').classList.add('zone');
-  mapTo(z.mapPos[0],z.mapPos[1]-70,1.1,414);
+  mapTo(z.mapPos[0],z.mapPos[1]-70,1.1,(window.SH||844)-$('zoneSheet').offsetHeight);
   // 확대 화면: 민수·가나를 작게, 핀 왼쪽 아래에 (다른 존이면 잠깐 숨김)
   const D=$('duo'), cz2=curZone(); D.classList.add('mini');
   if(cz2===z){ D.classList.remove('away'); D.style.left=(z.mapPos[0]-100)+'px'; D.style.top=(z.mapPos[1]+40)+'px'; } else D.classList.add('away');
