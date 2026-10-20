@@ -688,7 +688,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgsk2zs"></script>
+<script src="data.js?v=mvgsl9w0"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1272,7 +1272,7 @@ function vnMenu(){
     }
     for(const t of n.talk||[]){ await vnSay({who:n.key,t}); await waitTap(); }
     if(sp.hintInTalk && sp.hintBy===n.key && !isFound(sp.id)){   // 이야기 끝에 이어서 힌트
-      await vnSay({who:n.key,t:'그리고… 힌트 하나 알려 줄게.'}); await waitTap();
+      if(!sp.hintNoIntro){ await vnSay({who:n.key,t:'그리고… 힌트 하나 알려 줄게.'}); await waitTap(); }
       for(const h of [].concat(sp.hint||[])){ await vnSay(typeof h==='object'?h:{who:n.key,t:h}); await waitTap(); }
     }
     if(n.gift && !hasGift(sp.id+':'+n.key)){ if(n.gift.pre){ await vnSay({who:n.key,t:n.gift.pre}); await waitTap(); } await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
