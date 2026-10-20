@@ -682,7 +682,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgrnmew"></script>
+<script src="data.js?v=mvgrocxn"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1289,6 +1289,15 @@ function openSpot(id){
   $('vnChoices').innerHTML=''; $('vnText').textContent='';
   vnLines=talkLines(sp); vnI=0;
   show('spotScr');
+  if(sp.arriveCheck && !isFound(sp.id)){   // 마지막 장소: 도착 확인 먼저
+    const A=sp.arriveCheck, rest=vnLines; vnLines=[];
+    (async()=>{
+      await wait(450); await vnSay({who:'both',t:A.ask});
+      if(await choose([A.yes,A.no])===A.no){ await vnSay({who:'both',t:A.noLine}); await waitTap(); renderMap(); show('mapScr'); return; }
+      vnLines=(A.yesLines||[]).concat(rest); vnI=0; vnNext();
+    })();
+    return;
+  }
   setTimeout(vnNext,450);
 }
 $('vnBox').addEventListener('click',vnNext);
