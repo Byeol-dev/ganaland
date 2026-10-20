@@ -544,6 +544,15 @@
   #mapScr.travel #mapHint{display:none}
   #duo.walk img{animation:walkHop .28s steps(2) infinite}
   @keyframes walkHop{50%{transform:translateY(-14px) rotate(4deg)}}
+  #giftScr.shake #giftFloat{opacity:1;top:240px;animation:shakeIt .18s steps(2) infinite}
+  @keyframes shakeIt{0%{transform:rotate(-20deg) translateX(-6px)}100%{transform:rotate(20deg) translateX(6px)}}
+  #giftScr.shake .hb{animation:prayBob .3s steps(2) infinite}
+  #giftScr.samba .hb{animation:sambaDance .36s steps(2) infinite}
+  #giftScr.samba .hb+.hb{animation-delay:.18s}
+  @keyframes sambaDance{0%,100%{transform:rotate(-8deg) translate(-8px,0)}50%{transform:rotate(8deg) translate(8px,-12px)}}
+  #giftScr.samba #giftBub,#giftScr.shake #giftBub{opacity:1}
+  #giftScr.samba #giftFloat{opacity:1;top:250px;animation:drumBeat .36s steps(2) infinite}
+  @keyframes drumBeat{50%{transform:scale(1.25)}}
 </style>
 </head>
 <body>
@@ -670,7 +679,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgr8y77"></script>
+<script src="data.js?v=mvgreoja"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1126,7 +1135,7 @@ function talkLines(sp){
       '봉투 안의 비밀 코드를 입력하면 퍼즐 조각이랑 작은 문장을 줄게!',
       '힌트가 필요하면 말해 줘~'
     ]);
-  return raw.filter(t=>!(sp.guide==='orange'&&!sp.talk&&t==='힌트가 필요하면 말해 줘~')).map((t,i)=>({who:who(i),t}));   // 승연은 힌트 안내 줄 생략
+  return raw.filter(t=>!(sp.guide==='orange'&&!sp.talk&&t==='힌트가 필요하면 말해 줘~')).map((t,i)=> typeof t==='object' ? t : ({who:who(i),t}));   // 승연은 힌트 안내 줄 생략
 }
 function setChars(sp){
   const el=$('vnChars');
@@ -1196,13 +1205,17 @@ function vnMenu(){
   if(isFound(sp.id)){
     btn('책 보기','gold',()=>openBook(null)); btn('지도로','ghost',()=>show('mapScr')); return;
   }
-  if(sp.mission&&sp.mission.length){   // 미션형 스팟: 체크리스트
-    sp.mission.forEach((m,i)=>{ const k=sp.id+':'+i, done=MISSION.includes(k);
-      const b=btn(`${done?'✅':'⬜'} ${m}`,done?'ghost mdone':'ghost',()=>{
-        if(MISSION.includes(k)) MISSION=MISSION.filter(x=>x!==k); else { MISSION.push(k); beep([[784,.05],[988,.08]]); const r=b.getBoundingClientRect(),st=stage.getBoundingClientRect(),sc=st.width/390; burst((r.left-st.left)/sc+40,(r.top-st.top)/sc+20,16,{up:true,speed:3}); }
-        saveMission();
-        if(sp.mission.every((_,j)=>MISSION.includes(sp.id+':'+j))) toast('미션 완료! 곧 눈앞에 뾰로롱… ✨');
-        vnMenu();
+  if(sp.mission&&sp.mission.length){   // 미션형 스팟: 대사 → 연출 → 완료
+    sp.mission.forEach((m,i)=>{ const k=sp.id+':'+i, done=MISSION.includes(k), label=m.label||m;
+      btn(`${done?'✅':'⬜'} ${label}`,done?'ghost mdone':'ghost',async()=>{
+        if(MISSION.includes(k)){ toast('이미 완료한 미션이야! ✅'); return; }
+        C.innerHTML='';
+        for(const l of (m.talk||[])){ await vnSay(l); await waitTap(); }
+        if(m.gift) await giftScene(sp,{key:'mission'+i,gift:m.gift});
+        if(m.gift&&m.gift.after){ await vnSay({who:(m.talk&&m.talk.length?m.talk[m.talk.length-1].who:sp.guide),t:m.gift.after}); await waitTap(); }
+        MISSION.push(k); saveMission();
+        toast(sp.mission.every((_,j)=>MISSION.includes(sp.id+':'+j)) ? '미션 모두 완료! 곧 눈앞에 뾰로롱… ✨' : `미션 완료! ✅ ${label}`);
+        enterFree(); vnMenu();
       });
     });
   }
@@ -1222,7 +1235,7 @@ function vnMenu(){
     const w= sp.hintBy || (sp.guide==='both' ? 'purple' : sp.guide);
     await vnSay({who:w,t: npcOf(w) ? '(살금살금 다가와서 속삭인다)' : '힌트는 딱 하나야. 잘 들어!'}); await wait(500);
     const H=Array.isArray(sp.hint)?sp.hint:[sp.hint||'음… 힌트는 아직 비밀이야!'];
-    for(let i=0;i<H.length;i++){ await vnSay({who:w,t:H[i]}); if(i<H.length-1) await waitTap(); }
+    for(let i=0;i<H.length;i++){ const h=H[i]; await vnSay(typeof h==='object'?h:{who:w,t:h}); if(i<H.length-1) await waitTap(); }
     if((sp.npcs&&sp.npcs.length)||sp.alone){ await waitTap(); enterFree(); }
     vnMenu();
   });
@@ -1272,7 +1285,7 @@ $('codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter') $('codeGo').clic
 /* ---------- 선물 → 가나·민수 살짝 취함 + 레벨업 ---------- */
 async function giftScene(sp,n){
   const g=n.gift, S=$('giftScr'); S.className='screen on';
-  $('giftEmoji').textContent=g.emoji||'🎁'; const jc=g.item.charCodeAt(g.item.length-1), has=(jc>=0xAC00&&jc<=0xD7A3&&(jc-0xAC00)%28); $('giftTx').textContent=`${g.item}${has?'을':'를'} 받았다!`;
+  $('giftEmoji').textContent=g.emoji||'🎁'; const jc=g.item.charCodeAt(g.item.length-1), has=(jc>=0xAC00&&jc<=0xD7A3&&(jc-0xAC00)%28); $('giftTx').textContent= g.title || `${g.item}${has?'을':'를'} 받았다!`;
   $('giftMood').textContent=''; $('lvStats').innerHTML=g.stats||'기분 <em>■■■■■</em> MAX<br>용기 <em>+1</em> · 보물 감각 <em>+1</em>'; $('lvFrom').textContent='Lv.'+LV.lv; $('lvTo').textContent='Lv.'+(LV.lv+1);
   beep([[523,.06],[659,.06],[784,.12]]);
   await wait(1300); S.classList.add('drink'); beep([[392,.08],[330,.08],[392,.12]]);
@@ -1281,6 +1294,9 @@ async function giftScene(sp,n){
   S.classList.add(g.effect||'tipsy');
   if(g.effect==='bless'){ beep([[1568,.08],[1319,.08],[1568,.2]]); for(let k=0;k<4;k++){ burst(195,430,22,{speed:3,life:50}); await wait(200); } }
   if(g.effect==='party'){ beep([[523,.12],[523,.12],[587,.25],[523,.25],[698,.25],[659,.5]]); for(let k=0;k<6;k++){ burst(80+Math.random()*230,260,26,{up:true,speed:5,coin:k%3===0,life:70}); await wait(220); } }
+  if(g.effect==='shake'){ for(let k=0;k<8;k++){ beep([[1800+Math.random()*600,.02],[1400,.02]]); burst(195,300,6,{speed:2,life:24}); await wait(160); } }
+  if(g.effect==='samba'){ const P=[[98,.12],[0,.06],[392,.05],[392,.05],[98,.12],[523,.05],[392,.05],[0,.06]];
+    for(let r=0;r<3;r++){ for(const [f,d] of P){ if(f) beep([[f,d]]); await wait(d*1000+60); } burst(80+Math.random()*230,420,14,{up:true,speed:3}); } }
   if(g.effect==='wish'){ beep([[659,.1],[784,.1],[988,.25]]); for(let k=0;k<5;k++){ burst(195,300-k*40,10,{speed:1.5,life:40}); await wait(220); } }
   await type($('giftMood'), g.mood || '가나·민수가 살짝 취했다~ 헤헤<br>기분이 아주 좋아졌다! ♪', 45);
   await wait(900);
@@ -1450,6 +1466,13 @@ async function openFinal(){
   F.classList.add('end');
 }
 $('finalBook').onclick=()=>openBook(null);
+
+/* ---------- 그림 미리 받아 두기 (느린 망에서 배경 빈칸 방지) ---------- */
+(function preload(){
+  const set=new Set(['guide_purple','guide_orange','hero_m','hero_w','npc_uncle_anim','npc_geumpung_body','npc_geumpung_tail']);
+  SPOTS.forEach(sp=>{ if(sp.bg) set.add(sp.bg); (sp.npcs||[]).forEach(n=>set.add(n.img)); (sp.crowd||[]).forEach(c=>set.add(c.img)); });
+  setTimeout(()=>set.forEach(n=>{ const im=new Image(); im.src='assets/'+n+'.png'; }),1500);
+})();
 
 /* ---------- 오프닝 → 지도 ---------- */
 $('goMap').onclick=()=>{ beep([[784,.06],[1047,.12]]); $('next').style.display='none'; openIntro(); };
