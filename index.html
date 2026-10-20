@@ -534,6 +534,8 @@
   @keyframes partyHop{50%{transform:translateY(-14px) rotate(4deg)}}
   #giftScr.party #giftBub{opacity:1}
   #giftScr.party #giftBub b{color:#ffe066}
+  #vnChars{transition:bottom .4s steps(5)}
+  html,body{height:100%;height:100dvh}
 </style>
 </head>
 <body>
@@ -660,7 +662,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgqycwc"></script>
+<script src="data.js?v=mvgr4abq"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -713,7 +715,15 @@ const clouds = document.getElementById('clouds');
 
 /* ---------- 화면 맞춤 ---------- */
 const stage = document.getElementById('stage');
-function fit(){ const s=Math.min(innerWidth/390, innerHeight/844); stage.style.transform=`translate(-50%,-50%) scale(${s})`; }
+function fit(){
+  const vv=window.visualViewport, W=Math.min(innerWidth, vv?vv.width:innerWidth, document.documentElement.clientWidth||innerWidth),
+        H=Math.min(innerHeight, vv?vv.height:innerHeight, document.documentElement.clientHeight||innerHeight);
+  const s=Math.min(W/390, H/844);
+  stage.style.top=((vv?vv.offsetTop:0)+H/2)+'px';
+  stage.style.transform=`translate(-50%,-50%) scale(${s})`;
+}
+if(window.visualViewport){ visualViewport.addEventListener('resize',fit); visualViewport.addEventListener('scroll',fit); }
+addEventListener('orientationchange',()=>setTimeout(fit,300));
 addEventListener('resize',fit); fit();
 
 /* ---------- 8bit 효과음 ---------- */
@@ -1110,6 +1120,10 @@ function speaker(who){
   document.querySelectorAll('#vnChars .ch').forEach(im=>{ const me=who==='both'||im.dataset.who===who; im.classList.toggle('dim',!me); im.classList.toggle('talk',me); });
 }
 const GUIDES=['purple','orange','both'];
+function syncChars(){
+  const S=$('spotScr'), free=S.classList.contains('free');
+  $('vnChars').style.bottom = free ? Math.max(120,$('vnChoices').offsetHeight+30)+'px' : '';
+}
 function enterFree(){
   const S=$('spotScr'); S.classList.add('free');
   document.querySelectorAll('#vnChars .gd,#vnChars .solo,#vnChars .l,#vnChars .r').forEach(e=>e.classList.add('gone'));
@@ -1119,7 +1133,7 @@ function enterFree(){
 let freePending=false;
 async function vnSay(line){
   const S=$('spotScr');
-  if(S.classList.contains('free')){ S.classList.remove('free');
+  if(S.classList.contains('free')){ S.classList.remove('free'); syncChars();
     if(GUIDES.includes(line.who)){
       document.querySelectorAll('#vnChars .pc').forEach(e=>e.classList.add('gone'));   // 가이드가 말하면 민수·가나는 잠깐 비켜 줌
       document.querySelectorAll('#vnChars .gone:not(.pc)').forEach(e=>{ if(line.who==='both'||e.dataset.who===line.who) e.classList.remove('gone'); }); } }
@@ -1141,6 +1155,7 @@ async function vnNext(){
 }
 let introMode=false;
 function vnMenu(){
+  requestAnimationFrame(syncChars);
   const sp=curSpot, C=$('vnChoices'); C.innerHTML='';
   const btn=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='pbtn '+cls; b.innerHTML=label; b.onclick=e=>{ e.stopPropagation(); fn(b); }; C.appendChild(b); return b; };
   if(introMode){ btn('🗺️ 보물 지도 열기','gold wide',()=>{ introMode=false; renderMap(); show('mapScr'); }); return; }
@@ -1200,7 +1215,7 @@ function openSpot(id){
   $('spotAddr').textContent=sp.addr||sp.zone.sub;
   // 배경: 지도에서 그 존 근처를 크게
   setBg(sp.bg, sp.zone.mapPos);
-  $('spotScr').classList.remove('free'); freePending=false;
+  $('spotScr').classList.remove('free'); freePending=false; $('vnChars').style.bottom='';
   setChars(sp);
   $('codeIn').value=''; $('codeMsg').textContent=''; $('codeRow').classList.remove('on');
   $('vnChoices').innerHTML=''; $('vnText').textContent='';
