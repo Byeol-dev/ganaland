@@ -560,6 +560,8 @@
   #spotScr.nochoice #vnBox{bottom:44px}
   #spotScr.nochoice:not(.free) #vnChars{bottom:200px}
   #spotScr #codeMsg:not(:empty){padding:8px 10px;font-size:13px;color:#fff;background:#e8344e;box-shadow:0 -3px 0 #e8344e,0 3px 0 #e8344e,-3px 0 0 #e8344e,3px 0 0 #e8344e}
+  #duo.mini img{height:72px}
+  #duo.away{opacity:0}
 </style>
 </head>
 <body>
@@ -686,7 +688,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgs8ozo"></script>
+<script src="data.js?v=mvgscurj"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1017,13 +1019,16 @@ async function travel(from,to){
   $('mapScr').classList.remove('travel'); travelling=false;
 }
 let selZone=null;
-function closeZone(){ selZone=null; $('mapScr').classList.remove('zone');
+function closeZone(){ selZone=null; $('mapScr').classList.remove('zone'); $('duo').classList.remove('mini','away'); if(!travelling) placeDuo(curZone());
   const cz=curZone(), V=ZONES.slice(0,ZONES.indexOf(cz)+1), cx=V.reduce((a,z)=>a+z.mapPos[0],0)/V.length, cy=V.reduce((a,z)=>a+z.mapPos[1],0)/V.length;
   mapTo(cx,cy,MAP_SCALE,844); }
 function selectZone(id,quiet){
   selZone=id; const z=ZONES.find(z=>z.id===id), nx=nextSpot();
   $('mapScr').classList.add('zone');
   mapTo(z.mapPos[0],z.mapPos[1]-70,1.1,414);
+  // 확대 화면: 민수·가나를 작게, 핀 왼쪽 아래에 (다른 존이면 잠깐 숨김)
+  const D=$('duo'), cz2=curZone(); D.classList.add('mini');
+  if(cz2===z){ D.classList.remove('away'); D.style.left=(z.mapPos[0]-100)+'px'; D.style.top=(z.mapPos[1]+40)+'px'; } else D.classList.add('away');
   $('zsStage').textContent= z.final?'FINAL STAGE':'STAGE '+z.stage; $('zsName').textContent=z.name;
   const L=$('spotList'); L.innerHTML='';
   z.spots.forEach((sp,i)=>{
