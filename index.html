@@ -660,7 +660,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgquo1t"></script>
+<script src="data.js?v=mvgqycwc"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1086,9 +1086,11 @@ function talkLines(sp){
 }
 function setChars(sp){
   const el=$('vnChars');
-  if(sp.npcs&&sp.npcs.length){   // NPC 는 왼쪽, 안내 캐릭터는 오른쪽
+  const npcs=sp.npcs||[];
+  if(npcs.length||sp.alone||sp.crowd){   // NPC 는 왼쪽, 안내 캐릭터는 오른쪽
     const g= sp.guide==='both' ? ['orange','purple'] : [sp.guide];
-    el.innerHTML = sp.npcs.map((n,i)=>{
+    el.innerHTML = (sp.crowd||[]).map(c=>`<img class="ch npc crowd${c.anim==='dance'?' dance':''}" style="left:${c.x}px;bottom:${c.y||0}px;height:${c.h||120}px" data-who="crowd" src="assets/${c.img}.png" alt="">`).join('')
+      + npcs.map((n,i)=>{
         const st=`left:${n.x!=null?n.x:8+i*80}px`+(n.h?`;height:${n.h}px`:'')+(n.y?`;bottom:${n.y}px`:'');
         if(n.anim==='drink') return `<div class="ch npc drink" style="${st}" data-who="${n.key}"></div>`;
         if(n.anim==='wag') return `<div class="ch npc wag${n.small?' small':''}" style="${st}" data-who="${n.key}"><img src="assets/${n.img}_body.png" alt=""><img class="tail" src="assets/${n.img}_tail.png" alt=""></div>`;
@@ -1134,7 +1136,7 @@ async function vnNext(){
   if(vnI>=vnLines.length) return;
   if(vnI<vnLines.length){ const l=vnLines[vnI++]; $('vnChoices').innerHTML=''; await vnSay(l);
     if(vnI<vnLines.length) $('vnBox').classList.add('wait');
-    else if(curSpot&&curSpot.npcs&&!introMode&&!isFound(curSpot.id)){ freePending=true; $('vnBox').classList.add('wait'); }
+    else if(curSpot&&((curSpot.npcs&&curSpot.npcs.length)||curSpot.alone)&&!introMode&&!isFound(curSpot.id)){ freePending=true; $('vnBox').classList.add('wait'); }
     else vnMenu(); }
 }
 let introMode=false;
@@ -1172,7 +1174,7 @@ function vnMenu(){
     await vnSay({who:w,t: npcOf(w) ? '(살금살금 다가와서 속삭인다)' : '힌트는 딱 하나야. 잘 들어!'}); await wait(500);
     const H=Array.isArray(sp.hint)?sp.hint:[sp.hint||'음… 힌트는 아직 비밀이야!'];
     for(let i=0;i<H.length;i++){ await vnSay({who:w,t:H[i]}); if(i<H.length-1) await waitTap(); }
-    if(sp.npcs&&sp.npcs.length){ await waitTap(); enterFree(); }
+    if((sp.npcs&&sp.npcs.length)||sp.alone){ await waitTap(); enterFree(); }
     vnMenu();
   });
 }
