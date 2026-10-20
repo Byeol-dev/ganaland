@@ -660,7 +660,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgqtwya"></script>
+<script src="data.js?v=mvgquo1t"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1082,7 +1082,7 @@ function talkLines(sp){
       '봉투 안의 비밀 코드를 입력하면 퍼즐 조각이랑 작은 문장을 줄게!',
       '힌트가 필요하면 말해 줘~'
     ]);
-  return raw.map((t,i)=>({who:who(i),t}));
+  return raw.filter(t=>!(sp.guide==='orange'&&!sp.talk&&t==='힌트가 필요하면 말해 줘~')).map((t,i)=>({who:who(i),t}));   // 승연은 힌트 안내 줄 생략
 }
 function setChars(sp){
   const el=$('vnChars');
