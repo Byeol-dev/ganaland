@@ -553,6 +553,9 @@
   #giftScr.samba #giftBub,#giftScr.shake #giftBub{opacity:1}
   #giftScr.samba #giftFloat{opacity:1;top:250px;animation:drumBeat .36s steps(2) infinite}
   @keyframes drumBeat{50%{transform:scale(1.25)}}
+  #spotScr.on #vnChars img.ch.glow{animation:lampGlow 1.4s steps(2) infinite}
+  @keyframes lampGlow{0%,100%{filter:drop-shadow(0 0 4px rgba(255,224,102,.5))}50%{filter:drop-shadow(0 0 16px rgba(255,224,102,.95)) brightness(1.1)}}
+  #vnChars img.ch[style*="height"]{height:auto}
 </style>
 </head>
 <body>
@@ -679,7 +682,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgrewh4"></script>
+<script src="data.js?v=mvgrnmew"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -823,12 +826,14 @@ const $ = id => document.getElementById(id);
 const wait = ms => new Promise(r=>setTimeout(r,ms));
 let ready=false;
 async function type(el, html, speed=40){
+  const tok=(el._tok=(el._tok||0)+1);   // 같은 칸에 새로 쓰기 시작하면 이전 타이핑은 멈춤
   el.classList.add('in'); el.innerHTML='';
   const tmp=document.createElement('div'); tmp.innerHTML=html;
   for(const node of tmp.childNodes){
+    if(el._tok!==tok) return;
     const target = node.nodeType===3 ? el : el.appendChild(node.cloneNode(false));
     const tn=document.createTextNode(''); target.appendChild(tn);
-    for(const ch of node.textContent){ tn.data+=ch; if(ch.trim()&&Math.random()<.5) beep([[440+Math.random()*220,.015]]); await wait(speed); }
+    for(const ch of node.textContent){ if(el._tok!==tok) return; tn.data+=ch; if(ch.trim()&&Math.random()<.5) beep([[440+Math.random()*220,.015]]); await wait(speed); }
   }
 }
 async function opening(){
@@ -971,7 +976,7 @@ function renderMap(){
   // 주인공 위치 — 새 존이 열렸으면 이전 존에서 걸어서 이동
   const LZ='ganaland_zone_v1'; let last=null; try{ last=localStorage.getItem(LZ) }catch(e){}
   const pz=ZONES.find(z=>z.id===last);
-  if(pz && ZONES.indexOf(pz)<ZONES.indexOf(cz) && !travelling) travel(pz,cz);
+  if(pz && ZONES.indexOf(pz)<ZONES.indexOf(cz) && !travelling){ selZone=null; travel(pz,cz); }   // 시트 닫고 전체 지도에서 이동
   else if(!travelling){ $('duo').style.left=(cz.mapPos[0]-190)+'px'; $('duo').style.top=(cz.mapPos[1]+30)+'px'; }
   try{ localStorage.setItem(LZ,cz.id) }catch(e){}
   if(selZone && VIS.some(z=>z.id===selZone)) selectZone(selZone,true); else closeZone();
@@ -1147,11 +1152,12 @@ function setChars(sp){
         const st=`left:${n.x!=null?n.x:8+i*80}px`+(n.h?`;height:${n.h}px`:'')+(n.y?`;bottom:${n.y}px`:'');
         if(n.anim==='drink') return `<div class="ch npc drink" style="${st}" data-who="${n.key}"></div>`;
         if(n.anim==='wag') return `<div class="ch npc wag${n.small?' small':''}" style="${st}" data-who="${n.key}"><img src="assets/${n.img}_body.png" alt=""><img class="tail" src="assets/${n.img}_tail.png" alt=""></div>`;
-        return `<img class="ch npc${n.small?' small':''}${n.anim==='dance'?' dance':''}" style="${st}" data-who="${n.key}" src="assets/${n.img}.png" alt="">`;
+        const im=(n.cakeImg&&hasGift(sp.id+':'+n.key))?n.cakeImg:n.img;
+        return `<img class="ch npc${n.small?' small':''}${n.anim==='dance'?' dance':''}${n.anim==='glow'?' glow':''}" style="${st}" data-who="${n.key}" src="assets/${im}.png" alt="">`;
       }).join('')
-      + g.map((k,i)=>`<img class="ch gd" style="right:${6+(g.length-1-i)*92}px" data-who="${k}" src="assets/guide_${k}.png" alt="">`).join('')
-      + '<img class="ch pc gone" style="right:104px" data-who="minsu" src="assets/hero_m.png" alt="민수">'
-      + '<img class="ch pc gone" style="right:2px" data-who="gana" src="assets/hero_w.png" alt="가나">';   // 가이드 퇴장 후 등장
+      + g.map((k,i)=>`<img class="ch gd" style="${sp.guideStyle?sp.guideStyle[i]:'right:'+(6+(g.length-1-i)*92)+'px'}" data-who="${k}" src="assets/guide_${k}.png" alt="">`).join('')
+      + `<img class="ch pc gone" style="${sp.pcStyle?sp.pcStyle[0]:'right:104px'}" data-who="minsu" src="assets/hero_m.png" alt="민수">`
+      + `<img class="ch pc gone" style="${sp.pcStyle?sp.pcStyle[1]:'right:2px'}" data-who="gana" src="assets/hero_w.png" alt="가나">`;   // 가이드 퇴장 후 등장
     return;
   }
   el.innerHTML = sp.guide==='both'
@@ -1169,7 +1175,7 @@ function syncChars(){
 }
 function enterFree(){
   const S=$('spotScr'); S.classList.add('free');
-  document.querySelectorAll('#vnChars .gd,#vnChars .solo,#vnChars .l,#vnChars .r').forEach(e=>e.classList.add('gone'));
+  if(!(curSpot&&curSpot.guidesStay)) document.querySelectorAll('#vnChars .gd,#vnChars .solo,#vnChars .l,#vnChars .r').forEach(e=>e.classList.add('gone'));
   document.querySelectorAll('#vnChars .pc').forEach((e,i)=>setTimeout(()=>e.classList.remove('gone'),250+i*180));   // 민수·가나 입장
   document.querySelectorAll('#vnChars .ch').forEach(e=>e.classList.remove('dim','talk'));
 }
@@ -1178,7 +1184,7 @@ async function vnSay(line){
   const S=$('spotScr');
   if(S.classList.contains('free')){ S.classList.remove('free'); syncChars();
     if(GUIDES.includes(line.who)){
-      document.querySelectorAll('#vnChars .pc').forEach(e=>e.classList.add('gone'));   // 가이드가 말하면 민수·가나는 잠깐 비켜 줌
+      if(!(curSpot&&curSpot.guidesStay)) document.querySelectorAll('#vnChars .pc').forEach(e=>e.classList.add('gone'));   // 가이드가 말하면 민수·가나는 잠깐 비켜 줌
       document.querySelectorAll('#vnChars .gone:not(.pc)').forEach(e=>{ if(line.who==='both'||e.dataset.who===line.who) e.classList.remove('gone'); }); } }
   speaker(line.who); const box=$('vnBox'), tx=$('vnText');
   box.classList.remove('wait'); tx.textContent=''; vnTyping=true; vnSkip=false;
@@ -1186,6 +1192,7 @@ async function vnSay(line){
   vnTyping=false;
   document.querySelectorAll('#vnChars .ch').forEach(im=>im.classList.remove('talk'));
 }
+function choose(opts){ const C=$('vnChoices'); C.innerHTML=''; return new Promise(r=>opts.forEach(o=>{ const b=document.createElement('button'); b.className='pbtn '+(o===opts[0]?'gold':'ghost'); b.textContent=o; b.onclick=e=>{ e.stopPropagation(); C.innerHTML=''; r(o); }; C.appendChild(b); })); }
 function waitTap(){ $('vnBox').classList.add('wait'); return new Promise(r=>{ const f=()=>{ $('vnBox').removeEventListener('click',f); $('vnBox').classList.remove('wait'); r(); }; setTimeout(()=>$('vnBox').addEventListener('click',f),50); }); }
 async function vnNext(){
   if(vnTyping){ vnSkip=true; return; }
@@ -1226,6 +1233,20 @@ function vnMenu(){
   });
   (sp.npcs||[]).forEach(n=>btn(`💬 ${n.name}`,'ghost',async()=>{
     C.innerHTML='';
+    if(n.flow==='meal'){   // 루아흐: 처음엔 식사 안내 → 다음엔 "다 먹었나요?" 예/아니오 → 케이크
+      const k=sp.id+':meal', gk=sp.id+':'+n.key;
+      if(hasGift(gk)){ await vnSay({who:n.key,t:'케이크 위 쪽지, 잘 봤어요? 😉'}); await waitTap(); enterFree(); vnMenu(); return; }
+      if(!MISSION.includes(k)){ for(const t of n.talk){ await vnSay({who:n.key,t}); await waitTap(); } MISSION.push(k); saveMission(); enterFree(); vnMenu(); return; }
+      await vnSay({who:n.key,t:n.ask});
+      if(await choose(['예','아니오'])==='아니오'){ await vnSay({who:n.key,t:n.no}); await waitTap(); enterFree(); vnMenu(); return; }
+      await vnSay({who:n.key,t:n.yes}); await wait(500);
+      const el=document.querySelector(`#vnChars [data-who="${n.key}"]`);
+      el.classList.add('gone'); beep([[330,.06],[262,.08]]); await wait(1400);
+      el.src='assets/'+n.cakeImg+'.png'; el.classList.remove('gone'); beep([[523,.06],[659,.06],[784,.12]]); await wait(500);
+      await vnSay({who:n.key,t:n.back}); await waitTap();
+      await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after}); await waitTap();
+      enterFree(); vnMenu(); return;
+    }
     for(const t of n.talk||[]){ await vnSay({who:n.key,t}); await waitTap(); }
     if(n.gift && !hasGift(sp.id+':'+n.key)){ await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
     enterFree(); vnMenu();
@@ -1378,7 +1399,9 @@ $('camCancel').onclick=()=>{ closeCam(); show(curSpot?'spotScr':'mapScr'); };
 
 /* ---------- 봉투 발견: 퍼즐 조각 + 작은 문장 ---------- */
 let lastSpot=null, lastFirst=false;
+let claiming=false;
 async function claim(sp){
+  if(claiming) return; claiming=true; setTimeout(()=>claiming=false,8000);   // 두 번 눌러도 한 번만
   const first=!isFound(sp.id);
   if(first){ found.push(sp.id); if(!saveFound(found)) toast('⚠ 저장이 안 돼요 (비공개 모드?)'); }
   lastSpot=sp; lastFirst=first;
@@ -1407,7 +1430,7 @@ async function claim(sp){
   const n=haveIdx().length;
   $('foundCnt').textContent= `퍼즐 조각 ${n}개 모았어요` + (first?' · 저장됨 ✓':' · 이미 찾은 봉투예요');
   $('foundGo').textContent='책에 담기 ▶';
-  foot.classList.add('in');
+  foot.classList.add('in'); claiming=false;
 }
 $('foundGo').onclick=()=>openBook(lastFirst?lastSpot:null);
 function escapeHtml(t){ return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
