@@ -562,6 +562,10 @@
   #spotScr #codeMsg:not(:empty){padding:8px 10px;font-size:13px;color:#fff;background:#e8344e;box-shadow:0 -3px 0 #e8344e,0 3px 0 #e8344e,-3px 0 0 #e8344e,3px 0 0 #e8344e}
   #duo.mini img{height:72px}
   #duo.away{opacity:0}
+  #flGift{text-align:center;font-size:52px;line-height:1;margin-bottom:10px;animation:giftBounce .7s steps(4) infinite}
+  @keyframes giftBounce{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-10px) rotate(4deg)}}
+  #flBody{font-size:17px;text-align:center}
+  #flSign{text-align:center}
 </style>
 </head>
 <body>
@@ -681,14 +685,14 @@
     <div id="finalHead"><div class="k">ALL PUZZLE PIECES</div><h3>퍼즐 완성!</h3></div>
     <canvas id="bigPuzzle"></canvas>
     <div id="finalDuo"><img src="assets/guide_orange.png" alt=""><img src="assets/guide_purple.png" alt=""></div>
-    <div id="finalBubble">우리가 주는 편지야! 열어 봐 ♥</div>
-    <div id="finalLetter"><h4 id="flTtl"></h4><div id="flBody"></div><div id="flSign"></div></div>
+    <div id="finalBubble">마지막 선물 시간이야! ♥</div>
+    <div id="finalLetter"><div id="flGift">💌🎁</div><h4 id="flTtl"></h4><div id="flBody"></div><div id="flSign"></div></div>
     <div id="finalFoot"><button class="pbtn ghost" id="finalBook">문장 책 다시 보기</button></div>
   </div>
   </div>
 </div>
 
-<script src="data.js?v=mvgsl9w0"></script>
+<script src="data.js?v=mvgsreqx"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1052,7 +1056,7 @@ function openPuzzle(){
   drawPuzzle($('pzBoard'),2,haveIdx());
   const n=haveIdx().length, done=n===TOTAL;
   $('pzCnt').textContent= done ? '퍼즐 완성! ♥' : `퍼즐 조각 ${n}개를 모았어요`;
-  $('pzFoot').innerHTML = done ? '<button class="pbtn gold" id="pzFinal">최종 편지 열기 ♥</button>' : '';
+  $('pzFoot').innerHTML = done ? '<button class="pbtn gold" id="pzFinal">마지막 선물 열기 🎁</button>' : '';
   if(done) $('pzFinal').onclick=openFinal;
   show('puzzleScr');
 }
@@ -1176,7 +1180,7 @@ function setChars(sp){
         const im=(n.cakeImg&&hasGift(sp.id+':'+n.key))?n.cakeImg:n.img;
         return `<img class="ch npc${n.small?' small':''}${n.anim==='dance'?' dance':''}${n.anim==='glow'?' glow':''}" style="${st}" data-who="${n.key}" src="assets/${im}.png" alt="">`;
       }).join('')
-      + g.map((k,i)=>`<img class="ch gd" style="${sp.guideStyle?sp.guideStyle[i]:'right:'+(6+(g.length-1-i)*92)+'px'}" data-who="${k}" src="assets/${(sp.guideImg&&sp.guideImg[k])||'guide_'+k}.png" alt="">`).join('')
+      + g.map((k,i)=>`<img class="ch gd" style="${sp.guideStyle?sp.guideStyle[i]:'right:'+(6+(g.length-1-i)*92)+'px'}" data-who="${k}" src="assets/${(entered(sp)&&sp.guideImgAfter&&sp.guideImgAfter[k])||'guide_'+k}.png" alt="">`).join('')
       + `<img class="ch pc gone" style="${sp.pcStyle?sp.pcStyle[0]:'right:104px'}" data-who="minsu" src="assets/hero_m.png" alt="민수">`
       + `<img class="ch pc gone" style="${sp.pcStyle?sp.pcStyle[1]:'right:2px'}" data-who="gana" src="assets/hero_w.png" alt="가나">`;   // 가이드 퇴장 후 등장
     return;
@@ -1288,6 +1292,7 @@ function vnMenu(){
     vnMenu();
   });
 }
+const entered=sp=>!!(sp&&sp.bgAfter&&(MISSION.includes(sp.id+':entered')||isFound(sp.id)));
 function setBg(bg,pos){
   const el=$('vnBg');
   if(bg){ el.className='pic'; el.style.backgroundImage=`url(assets/${bg}.png)`; el.style.transform=''; }
@@ -1309,14 +1314,14 @@ function openSpot(id){
   $('spotName').textContent=(sp.emoji?sp.emoji+' ':'')+sp.name;
   $('spotAddr').textContent=sp.addr||sp.zone.sub;
   // 배경: 지도에서 그 존 근처를 크게
-  setBg(sp.bg, sp.zone.mapPos);
+  setBg(entered(sp)&&sp.bgAfter?sp.bgAfter:sp.bg, sp.zone.mapPos);
   $('spotScr').classList.remove('free'); freePending=false; $('vnChars').style.bottom='';
   setChars(sp);
   $('codeIn').value=''; $('codeMsg').textContent=''; $('codeRow').classList.remove('on');
   $('vnChoices').innerHTML=''; $('vnText').textContent='';
   vnLines=talkLines(sp); vnI=0;
   show('spotScr');
-  if(sp.arriveCheck && !isFound(sp.id)){   // 마지막 장소: 도착 확인 먼저
+  if(sp.arriveCheck && !isFound(sp.id) && !entered(sp)){   // 마지막 장소: 도착 확인 먼저
     const A=sp.arriveCheck, rest=vnLines; vnLines=[];
     (async()=>{
       await wait(450); await vnSay({who:'both',t:A.ask});
@@ -1324,7 +1329,11 @@ function openSpot(id){
       for(const l of (A.yesLines||[])){ await vnSay(l); await waitTap(); }
       if(A.enter){ await choose([A.enter]);
         $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
-        beep([[523,.07],[659,.07],[784,.07],[1047,.25]]); for(let k=0;k<4;k++){ burst(195,420,30,{speed:5}); await wait(140); } }
+        beep([[523,.07],[659,.07],[784,.07],[1047,.25]]);
+        MISSION.push(sp.id+':entered'); saveMission();
+        if(sp.bgAfter) setBg(sp.bgAfter);   // 생일 파티 방으로
+        if(sp.guideImgAfter) document.querySelectorAll('#vnChars .gd').forEach(im=>{ const k=sp.guideImgAfter[im.dataset.who]; if(k) im.src='assets/'+k+'.png'; });   // 꼬깔모자
+        for(let k=0;k<6;k++){ burst(60+Math.random()*270,300+Math.random()*200,30,{speed:5,coin:k%2===0}); await wait(140); } }
       vnLines=rest; vnI=0; vnNext();
     })();
     return;
@@ -1487,7 +1496,7 @@ async function openBook(newSp){
   got.filter(sp=>sp!==newSp).forEach(sp=>add(sp,false));
   const complete=haveIdx().length===TOTAL;
   $('bookCnt').textContent=`퍼즐 조각 ${haveIdx().length}개`+(complete?' · 다 모았어!':'');
-  $('bookGo').textContent= complete ? '최종 편지 열기 ♥' : '지도로 ▶';
+  $('bookGo').textContent= complete ? '마지막 선물 열기 🎁' : '지도로 ▶';
   drawPuzzle($('miniPuzzle'),1,haveIdx(),{hide:newSp?[pieceIdx(newSp)]:[]});
   show('bookScr');
   $('book').scrollTop=$('book').scrollHeight;
@@ -1500,7 +1509,7 @@ async function openBook(newSp){
     await wait(700);
     drawPuzzle($('miniPuzzle'),1,haveIdx(),{glow:pieceIdx(newSp)}); beep([[523,.05],[1047,.1]]);
     burst(70,770,16,{up:true,speed:3});
-    if(complete){ await wait(500); $('bookBubble').textContent='퍼즐을 다 모았어! 우리가 준비한 편지가 있어 ♥'; }
+    if(complete){ await wait(500); $('bookBubble').textContent='퍼즐을 다 모았어! 우리가 준비한 선물이 있어 ♥'; }
   }
 }
 $('bookGo').onclick=()=>{ if(haveIdx().length===TOTAL) openFinal(); else { renderMap(); show('mapScr'); } };
@@ -1508,7 +1517,7 @@ $('bookGo').onclick=()=>{ if(haveIdx().length===TOTAL) openFinal(); else { rende
 /* ---------- 최종 편지 ---------- */
 async function openFinal(){
   await unlockReady; await unlockSaved();
-  if(!G.finalLetter){ toast('편지를 열려면 모든 봉투 코드가 필요해요'); return; }
+  if(!G.finalLetter){ toast('마지막 선물을 열려면 모든 봉투 코드가 필요해요'); return; }
   const F=$('finalScr'); F.className='screen';
   $('flTtl').textContent=G.finalLetter.title||''; $('flBody').textContent=''; $('flSign').textContent='';
   show('finalScr');
@@ -1533,7 +1542,7 @@ $('finalBook').onclick=()=>openBook(null);
 /* ---------- 그림 미리 받아 두기 (느린 망에서 배경 빈칸 방지) ---------- */
 (function preload(){
   const set=new Set(['guide_purple','guide_orange','hero_m','hero_w','npc_uncle_anim','npc_geumpung_body','npc_geumpung_tail']);
-  SPOTS.forEach(sp=>{ if(sp.bg) set.add(sp.bg); (sp.npcs||[]).forEach(n=>set.add(n.img)); (sp.crowd||[]).forEach(c=>set.add(c.img)); });
+  SPOTS.forEach(sp=>{ if(sp.bg) set.add(sp.bg); if(sp.bgAfter) set.add(sp.bgAfter); Object.values(sp.guideImgAfter||{}).forEach(n=>set.add(n)); if(sp.npcs) sp.npcs.forEach(n=>n.cakeImg&&set.add(n.cakeImg)); (sp.npcs||[]).forEach(n=>set.add(n.img)); (sp.crowd||[]).forEach(c=>set.add(c.img)); });
   setTimeout(()=>set.forEach(n=>{ const im=new Image(); im.src='assets/'+n+'.png'; }),1500);
 })();
 
