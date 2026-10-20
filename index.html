@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>가나랜드 보물찾기</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.39.3/dist/galmuri.css">
 <style>
@@ -494,7 +494,7 @@
   #vnChars .ch.talk{animation:talkBob .5s steps(2) infinite}
   #spotScr.on #vnChars img.ch.gone,#spotScr #vnChars .ch.gone{animation:none;transform:translateX(260px);opacity:0}
   #spotScr.free #vnBox{opacity:0;pointer-events:none;transform:translateY(20px)}
-  #vnBox{transition:opacity .25s steps(3),transform .25s steps(3)}
+  #vnBox{transition:opacity .25s steps(3),transform .25s steps(3),bottom .35s steps(4)}
   #vnChars .drink{width:117px;height:250px;background:url(assets/npc_uncle_anim.png) 0 0/234px 250px no-repeat;animation:drinkCycle 3.6s steps(1) infinite}
   @keyframes drinkCycle{0%,55%{background-position:0 0}56%,92%{background-position:-117px 0}93%,100%{background-position:0 0}}
   #vnChars .drink.talk{animation:drinkCycle 3.6s steps(1) infinite,talkBob .5s steps(2) infinite}
@@ -556,6 +556,10 @@
   #spotScr.on #vnChars img.ch.glow{animation:lampGlow 1.4s steps(2) infinite}
   @keyframes lampGlow{0%,100%{filter:drop-shadow(0 0 4px rgba(255,224,102,.5))}50%{filter:drop-shadow(0 0 16px rgba(255,224,102,.95)) brightness(1.1)}}
   #vnChars img.ch[style*="height"]{height:auto}
+  #stage,#mapView,#spotScr,.screen{overflow:clip}
+  #spotScr.nochoice #vnBox{bottom:44px}
+  #spotScr.nochoice:not(.free) #vnChars{bottom:200px}
+  #spotScr #codeMsg:not(:empty){padding:8px 10px;font-size:13px;color:#fff;background:#e8344e;box-shadow:0 -3px 0 #e8344e,0 3px 0 #e8344e,-3px 0 0 #e8344e,3px 0 0 #e8344e}
 </style>
 </head>
 <body>
@@ -575,7 +579,7 @@
     <img id="logo" src="assets/logo.png" alt="가나랜드 GANGHWADO"><div id="shine"></div>
   </div></div>
   <div id="title">
-    <div class="ko">강화읍 보물찾기</div>
+    <div class="ko">강화도 보물찾기</div>
     <div class="en">TREASURE HUNT</div>
   </div>
 
@@ -682,7 +686,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgrt1ms"></script>
+<script src="data.js?v=mvgs3bjb"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -744,6 +748,8 @@ function fit(){
 }
 if(window.visualViewport){ visualViewport.addEventListener('resize',fit); visualViewport.addEventListener('scroll',fit); }
 addEventListener('orientationchange',()=>setTimeout(fit,300));
+// 화면 상자가 안쪽으로 스크롤돼 밀리는 것 방지
+['stage','mapView'].forEach(id=>{ const el=document.getElementById(id); el.addEventListener('scroll',()=>{ if(el.scrollLeft||el.scrollTop){ el.scrollLeft=0; el.scrollTop=0; } }); });
 addEventListener('resize',fit); fit();
 
 /* ---------- 8bit 효과음 ---------- */
@@ -848,7 +854,7 @@ async function opening(){
   await wait(300);
   $('mascots').classList.add('in');
   await wait(750); burst(195,620,18,{up:true,speed:3});
-  await type($('bubble'), '안녕! 우리는 가나랜드 친구들이야.<br><b>강화읍</b> 곳곳에 보물이 숨겨져 있대. 같이 찾으러 갈래?');
+  await type($('bubble'), '안녕! 우리는 가나랜드 친구들이야.<br><b>강화도</b> 곳곳에 보물이 숨겨져 있대. 같이 찾으러 갈래?');
   $('start').classList.add('in'); ready=true;
   if(loadFound().length){   // 저장된 진행이 있으면 이어하기
     $('start').innerHTML=`이어하기 · ♥${loadFound().length}<span class="tri">▶</span>`;
@@ -974,23 +980,31 @@ function renderMap(){
     $('marks').appendChild(m);
   });
   // 주인공 위치 — 새 존이 열렸으면 이전 존에서 걸어서 이동
+  viewCx=VIS.reduce((a,z)=>a+z.mapPos[0],0)/VIS.length; viewCx=Math.min(944-195/viewSc,Math.max(195/viewSc,viewCx));
   const LZ='ganaland_zone_v1'; let last=null; try{ last=localStorage.getItem(LZ) }catch(e){}
   const pz=ZONES.find(z=>z.id===last);
   if(pz && ZONES.indexOf(pz)<ZONES.indexOf(cz) && !travelling){ selZone=null; travel(pz,cz); }   // 시트 닫고 전체 지도에서 이동
-  else if(!travelling){ $('duo').style.left=(cz.mapPos[0]-190)+'px'; $('duo').style.top=(cz.mapPos[1]+30)+'px'; }
+  else if(!travelling) placeDuo(cz);
   try{ localStorage.setItem(LZ,cz.id) }catch(e){}
   if(selZone && VIS.some(z=>z.id===selZone)) selectZone(selZone,true); else closeZone();
 }
 const josaRo=w=>{ const c=w.charCodeAt(w.length-1); if(c<0xAC00||c>0xD7A3) return '로'; const j=(c-0xAC00)%28; return (j===0||j===8)?'로':'으로'; };
+let viewCx=700, viewSc=.86;
+function duoPos(z){   // 마커 왼쪽에 공간이 없으면 오른쪽에
+  const [x,y]=z.mapPos, left=viewCx-195/viewSc+20, right=viewCx+195/viewSc-20;
+  let dx=x-190; if(dx-60<left) dx=x+175; if(dx+60>right) dx=right-60;
+  return [dx, y+30];
+}
+function placeDuo(z){ const [dx,dy]=duoPos(z); $('duo').style.left=dx+'px'; $('duo').style.top=dy+'px'; }
 let travelling=false;
 async function travel(from,to){
   travelling=true; const D=$('duo');
-  D.style.transition='none'; D.style.left=(from.mapPos[0]-190)+'px'; D.style.top=(from.mapPos[1]+30)+'px'; void D.offsetWidth;
+  D.style.transition='none'; placeDuo(from); void D.offsetWidth;
   $('travelBan').innerHTML=`<small>${from.name} 클리어!</small><b>${to.final?'FINAL':'STAGE '+to.stage} · ${to.name}${josaRo(to.name)} 이동!</b>`;
   $('mapScr').classList.add('travel');
   await wait(900);
   D.classList.add('walk'); D.style.transition='left 2.8s steps(28), top 2.8s steps(28)';
-  D.style.left=(to.mapPos[0]-190)+'px'; D.style.top=(to.mapPos[1]+30)+'px';
+  placeDuo(to);
   for(let k=0;k<14;k++){ // 반짝이 발자국
     const r=D.getBoundingClientRect(), st=stage.getBoundingClientRect(), sc=st.width/390;
     burst((r.left+r.width/2-st.left)/sc,(r.bottom-st.top)/sc,5,{speed:1.2,life:30});
@@ -1123,6 +1137,7 @@ const haveIdx=()=>SPOTS.filter(sp=>isFound(sp.id)).map(pieceIdx);
 /* ---------- 스팟: 대화 장면 ---------- */
 let curSpot=null, vnLines=[], vnI=0, vnTyping=false, vnSkip=false, vnHintSeen=false;
 const josaYa=w=>{ const c=w.charCodeAt(w.length-1); return (c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28) ? '이야' : '야'; };
+const npcOf2=(sp,k)=>(sp.npcs||[]).find(n=>n.key===k);
 const npcOf=k=>(curSpot&&curSpot.npcs||[]).find(n=>n.key===k);
 const GN=g=>{ const n=npcOf(g); if(n) return n.name; return (G.guides&&G.guides[g]&&G.guides[g].name)||(g==='purple'?'별':'승연'); };
 function talkLines(sp){
@@ -1140,7 +1155,8 @@ function talkLines(sp){
       '봉투 안의 비밀 코드를 입력하면 퍼즐 조각이랑 작은 문장을 줄게!',
       '힌트가 필요하면 말해 줘~'
     ]);
-  return raw.filter(t=>!(sp.guide==='orange'&&!sp.talk&&t==='힌트가 필요하면 말해 줘~')).map((t,i)=> typeof t==='object' ? t : ({who:who(i),t}));   // 승연은 힌트 안내 줄 생략
+  const hn=sp.hintInTalk&&npcOf2(sp,sp.hintBy);
+  return raw.filter(t=>!(sp.guide==='orange'&&!sp.talk&&t==='힌트가 필요하면 말해 줘~')).map(t=> (hn&&t==='힌트가 필요하면 말해 줘~') ? `힌트가 필요하면 ${hn.name}한테 물어봐~` : t).map((t,i)=> typeof t==='object' ? t : ({who:who(i),t}));   // 승연은 힌트 안내 줄 생략
 }
 function setChars(sp){
   const el=$('vnChars');
@@ -1169,6 +1185,8 @@ function speaker(who){
   document.querySelectorAll('#vnChars .ch').forEach(im=>{ const me=who==='both'||im.dataset.who===who; im.classList.toggle('dim',!me); im.classList.toggle('talk',me); });
 }
 const GUIDES=['purple','orange','both'];
+function syncChoices(){ $('spotScr').classList.toggle('nochoice', !$('vnChoices').children.length && !$('codeRow').classList.contains('on')); }
+new MutationObserver(syncChoices).observe(document.getElementById('vnChoices'),{childList:true});
 function syncChars(){
   const S=$('spotScr'), free=S.classList.contains('free');
   $('vnChars').style.bottom = free ? Math.max(120,$('vnChoices').offsetHeight+30)+'px' : '';
@@ -1181,7 +1199,7 @@ function enterFree(){
 }
 let freePending=false;
 async function vnSay(line){
-  const S=$('spotScr');
+  const S=$('spotScr'); syncChoices();
   if(S.classList.contains('free')){ S.classList.remove('free'); syncChars();
     if(GUIDES.includes(line.who)){
       if(!(curSpot&&curSpot.guidesStay)) document.querySelectorAll('#vnChars .pc').forEach(e=>e.classList.add('gone'));   // 가이드가 말하면 민수·가나는 잠깐 비켜 줌
@@ -1248,10 +1266,14 @@ function vnMenu(){
       enterFree(); vnMenu(); return;
     }
     for(const t of n.talk||[]){ await vnSay({who:n.key,t}); await waitTap(); }
-    if(n.gift && !hasGift(sp.id+':'+n.key)){ await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
+    if(sp.hintInTalk && sp.hintBy===n.key && !isFound(sp.id)){   // 이야기 끝에 이어서 힌트
+      await vnSay({who:n.key,t:'그리고… 힌트 하나 알려 줄게.'}); await waitTap();
+      for(const h of [].concat(sp.hint||[])){ await vnSay(typeof h==='object'?h:{who:n.key,t:h}); await waitTap(); }
+    }
+    if(n.gift && !hasGift(sp.id+':'+n.key)){ if(n.gift.pre){ await vnSay({who:n.key,t:n.gift.pre}); await waitTap(); } await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
     enterFree(); vnMenu();
   }));
-  const h=btn(vnHintSeen?'힌트 다시 듣기':'💡 힌트 보기','',async()=>{
+  const h= sp.hintInTalk ? null : btn(vnHintSeen?'힌트 다시 듣기':'💡 힌트 보기','',async()=>{
     vnHintSeen=true; C.innerHTML='';
     const w= sp.hintBy || (sp.guide==='both' ? 'purple' : sp.guide);
     await vnSay({who:w,t: npcOf(w) ? '(살금살금 다가와서 속삭인다)' : '힌트는 딱 하나야. 잘 들어!'}); await wait(500);
@@ -1313,7 +1335,7 @@ $('codeGo').onclick=async()=>{
   if(!sp || !sp.ready){ $('codeMsg').textContent='앗, 코드가 달라! 봉투를 다시 확인해 줘.'; const r=$('codeRow'); r.classList.remove('shake'); void r.offsetWidth; r.classList.add('shake'); beep([[180,.12]]); return; }
   claim(sp);
 };
-$('codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter') $('codeGo').click(); });
+$('codeIn').addEventListener('keydown',e=>{ if(e.key!=='Enter') return; if(e.isComposing||e.keyCode===229){ setTimeout(()=>$('codeGo').click(),60); return; } $('codeGo').click(); });   // 한글 조합 중 엔터도 마지막 글자까지 반영
 
 
 /* ---------- 선물 → 가나·민수 살짝 취함 + 레벨업 ---------- */
