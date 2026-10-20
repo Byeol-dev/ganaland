@@ -682,7 +682,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgronii"></script>
+<script src="data.js?v=mvgrt1ms"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1155,7 +1155,7 @@ function setChars(sp){
         const im=(n.cakeImg&&hasGift(sp.id+':'+n.key))?n.cakeImg:n.img;
         return `<img class="ch npc${n.small?' small':''}${n.anim==='dance'?' dance':''}${n.anim==='glow'?' glow':''}" style="${st}" data-who="${n.key}" src="assets/${im}.png" alt="">`;
       }).join('')
-      + g.map((k,i)=>`<img class="ch gd" style="${sp.guideStyle?sp.guideStyle[i]:'right:'+(6+(g.length-1-i)*92)+'px'}" data-who="${k}" src="assets/guide_${k}.png" alt="">`).join('')
+      + g.map((k,i)=>`<img class="ch gd" style="${sp.guideStyle?sp.guideStyle[i]:'right:'+(6+(g.length-1-i)*92)+'px'}" data-who="${k}" src="assets/${(sp.guideImg&&sp.guideImg[k])||'guide_'+k}.png" alt="">`).join('')
       + `<img class="ch pc gone" style="${sp.pcStyle?sp.pcStyle[0]:'right:104px'}" data-who="minsu" src="assets/hero_m.png" alt="민수">`
       + `<img class="ch pc gone" style="${sp.pcStyle?sp.pcStyle[1]:'right:2px'}" data-who="gana" src="assets/hero_w.png" alt="가나">`;   // 가이드 퇴장 후 등장
     return;
