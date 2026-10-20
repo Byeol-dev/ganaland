@@ -682,7 +682,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgrocxn"></script>
+<script src="data.js?v=mvgronii"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1294,7 +1294,11 @@ function openSpot(id){
     (async()=>{
       await wait(450); await vnSay({who:'both',t:A.ask});
       if(await choose([A.yes,A.no])===A.no){ await vnSay({who:'both',t:A.noLine}); await waitTap(); renderMap(); show('mapScr'); return; }
-      vnLines=(A.yesLines||[]).concat(rest); vnI=0; vnNext();
+      for(const l of (A.yesLines||[])){ await vnSay(l); await waitTap(); }
+      if(A.enter){ await choose([A.enter]);
+        $('flash').classList.remove('go'); void $('flash').offsetWidth; $('flash').classList.add('go');
+        beep([[523,.07],[659,.07],[784,.07],[1047,.25]]); for(let k=0;k<4;k++){ burst(195,420,30,{speed:5}); await wait(140); } }
+      vnLines=rest; vnI=0; vnNext();
     })();
     return;
   }
