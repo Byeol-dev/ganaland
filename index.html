@@ -688,7 +688,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgscurj"></script>
+<script src="data.js?v=mvgsimi1"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1254,7 +1254,7 @@ function vnMenu(){
     $('codeRow').classList.add('on'); $('codeIn').value=''; $('codeIn').focus();
     btn('◀ 돌아가기','ghost wide',()=>{ $('codeRow').classList.remove('on'); $('codeMsg').textContent=''; vnMenu(); });
   });
-  (sp.npcs||[]).forEach(n=>btn(`💬 ${n.name}`,'ghost',async()=>{
+  (sp.npcs||[]).filter(n=>!n.noButton).forEach(n=>btn(`💬 ${n.name}`,'ghost',async()=>{
     C.innerHTML='';
     if(n.flow==='meal'){   // 루아흐: 처음엔 식사 안내 → 다음엔 "다 먹었나요?" 예/아니오 → 케이크
       const k=sp.id+':meal', gk=sp.id+':'+n.key;
@@ -1278,7 +1278,7 @@ function vnMenu(){
     if(n.gift && !hasGift(sp.id+':'+n.key)){ if(n.gift.pre){ await vnSay({who:n.key,t:n.gift.pre}); await waitTap(); } await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
     enterFree(); vnMenu();
   }));
-  const h= sp.hintInTalk ? null : btn(vnHintSeen?'힌트 다시 듣기':'💡 힌트 보기','',async()=>{
+  const h= (sp.hintInTalk||sp.noHintButton) ? null : btn(vnHintSeen?'힌트 다시 듣기':'💡 힌트 보기','',async()=>{
     vnHintSeen=true; C.innerHTML='';
     const w= sp.hintBy || (sp.guide==='both' ? 'purple' : sp.guide);
     await vnSay({who:w,t: npcOf(w) ? '(살금살금 다가와서 속삭인다)' : '힌트는 딱 하나야. 잘 들어!'}); await wait(500);
