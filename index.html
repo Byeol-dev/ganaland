@@ -507,8 +507,8 @@
   @keyframes dogBreath{50%{transform:translateY(-2px)}}
   #codeIn{outline:none;border:0}
   #codeIn:focus{box-shadow:0 -3px 0 #fff,0 3px 0 #fff,-3px 0 0 #fff,3px 0 0 #fff,0 0 0 6px #ff8fb1}
-  #vnChars img.pc{height:205px}
-  #vnChars img.pc[data-who="gana"]{height:188px}
+  #vnChars img.pc{height:192px}
+  #vnChars img.pc[data-who="gana"]{height:176px}
   #spotScr.free #vnChars img.pc:not(.gone){animation:heroIdle 1s steps(2) infinite}
   #spotScr.free #vnChars img.pc[data-who="gana"]:not(.gone){animation-delay:.5s}
   @keyframes heroIdle{50%{transform:translateY(-4px)}}
@@ -524,6 +524,11 @@
   @keyframes lanternUp{0%{opacity:1;transform:translateY(60px)}25%{transform:translate(-12px,-60px)}50%{transform:translate(12px,-160px)}75%{transform:translate(-8px,-250px)}100%{opacity:0;transform:translate(6px,-330px)}}
   #giftScr.wish .hb{animation:prayBob 1.2s steps(2) infinite}
   @keyframes prayBob{50%{transform:translateY(-6px)}}
+  #spotScr.on #vnChars img.ch.dance{animation:samba .5s steps(2) infinite}
+  #spotScr.on #vnChars img.ch.dance:nth-child(2){animation-delay:.17s}
+  #spotScr.on #vnChars img.ch.dance:nth-child(3){animation-delay:.33s}
+  @keyframes samba{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8px) rotate(3deg)}}
+  #vnChoices .pbtn.mdone{color:#1f8a3e}
 </style>
 </head>
 <body>
@@ -650,7 +655,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgqjo9a"></script>
+<script src="data.js?v=mvgqqf14"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -871,6 +876,9 @@ function loadLv(){ try{ return JSON.parse(localStorage.getItem(LV_KEY))||{lv:1,g
 let LV=loadLv();
 function saveLv(){ try{ localStorage.setItem(LV_KEY,JSON.stringify(LV)) }catch(e){} }
 const hasGift=k=>LV.gifts.includes(k);
+const MS_KEY='ganaland_mission_v1';
+let MISSION=(()=>{ try{ return JSON.parse(localStorage.getItem(MS_KEY))||[] }catch(e){ return [] } })();
+function saveMission(){ try{ localStorage.setItem(MS_KEY,JSON.stringify(MISSION)) }catch(e){} }
 let toastT=0; function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('on'),2200); }
 let found=loadFound();
 const isFound=id=>found.includes(id);
@@ -1076,14 +1084,14 @@ function setChars(sp){
   if(sp.npcs&&sp.npcs.length){   // NPC 는 왼쪽, 안내 캐릭터는 오른쪽
     const g= sp.guide==='both' ? ['orange','purple'] : [sp.guide];
     el.innerHTML = sp.npcs.map((n,i)=>{
-        const st=`left:${n.x!=null?n.x:8+i*80}px`;
+        const st=`left:${n.x!=null?n.x:8+i*80}px`+(n.h?`;height:${n.h}px`:'')+(n.y?`;bottom:${n.y}px`:'');
         if(n.anim==='drink') return `<div class="ch npc drink" style="${st}" data-who="${n.key}"></div>`;
         if(n.anim==='wag') return `<div class="ch npc wag${n.small?' small':''}" style="${st}" data-who="${n.key}"><img src="assets/${n.img}_body.png" alt=""><img class="tail" src="assets/${n.img}_tail.png" alt=""></div>`;
-        return `<img class="ch npc${n.small?' small':''}" style="${st}" data-who="${n.key}" src="assets/${n.img}.png" alt="">`;
+        return `<img class="ch npc${n.small?' small':''}${n.anim==='dance'?' dance':''}" style="${st}" data-who="${n.key}" src="assets/${n.img}.png" alt="">`;
       }).join('')
       + g.map((k,i)=>`<img class="ch gd" style="right:${6+(g.length-1-i)*92}px" data-who="${k}" src="assets/guide_${k}.png" alt="">`).join('')
-      + '<img class="ch pc gone" style="right:118px" data-who="minsu" src="assets/hero_m.png" alt="민수">'
-      + '<img class="ch pc gone" style="right:14px" data-who="gana" src="assets/hero_w.png" alt="가나">';   // 가이드 퇴장 후 등장
+      + '<img class="ch pc gone" style="right:104px" data-who="minsu" src="assets/hero_m.png" alt="민수">'
+      + '<img class="ch pc gone" style="right:2px" data-who="gana" src="assets/hero_w.png" alt="가나">';   // 가이드 퇴장 후 등장
     return;
   }
   el.innerHTML = sp.guide==='both'
@@ -1131,6 +1139,16 @@ function vnMenu(){
   if(introMode){ btn('🗺️ 보물 지도 열기','gold wide',()=>{ introMode=false; renderMap(); show('mapScr'); }); return; }
   if(isFound(sp.id)){
     btn('책 보기','gold',()=>openBook(null)); btn('지도로','ghost',()=>show('mapScr')); return;
+  }
+  if(sp.mission&&sp.mission.length){   // 미션형 스팟: 체크리스트
+    sp.mission.forEach((m,i)=>{ const k=sp.id+':'+i, done=MISSION.includes(k);
+      const b=btn(`${done?'✅':'⬜'} ${m}`,done?'ghost mdone':'ghost',()=>{
+        if(MISSION.includes(k)) MISSION=MISSION.filter(x=>x!==k); else { MISSION.push(k); beep([[784,.05],[988,.08]]); const r=b.getBoundingClientRect(),st=stage.getBoundingClientRect(),sc=st.width/390; burst((r.left-st.left)/sc+40,(r.top-st.top)/sc+20,16,{up:true,speed:3}); }
+        saveMission();
+        if(sp.mission.every((_,j)=>MISSION.includes(sp.id+':'+j))) toast('미션 완료! 곧 눈앞에 뾰로롱… ✨');
+        vnMenu();
+      });
+    });
   }
   btn('🎉 보물을 찾았다!!','gold wide',()=>{   // → 봉투 속 비밀 코드 입력
     C.innerHTML=''; $('codeMsg').textContent='';
