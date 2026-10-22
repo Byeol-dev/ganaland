@@ -737,7 +737,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvgu2jzb"></script>
+<script src="data.js?v=mvj9o8ll"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1410,6 +1410,7 @@ $('vnBox').addEventListener('click',vnNext);
 $('spotX').onclick=()=>{ introMode=false; renderMap(); show('mapScr'); };
 $('codeGo').onclick=async()=>{
   const v=normCode($('codeIn').value);
+  if(document.activeElement===$('codeIn')) $('codeIn').blur();   // 키보드 내리고 화면 원위치
   const sp=await findSpotByCode(v);
   if(sp){ await unlockSpot(sp,v); await unlockSaved(); }
   if(!sp || !sp.ready){ $('codeMsg').textContent='앗, 코드가 달라! 봉투를 다시 확인해 줘.'; const r=$('codeRow'); r.classList.remove('shake'); void r.offsetWidth; r.classList.add('shake'); beep([[180,.12]]); return; }
