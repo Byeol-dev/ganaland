@@ -739,7 +739,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvlm487x"></script>
+<script src="data.js?v=mvlm52jq"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -1319,7 +1319,7 @@ function vnMenu(){
         if(m.gift) await giftScene(sp,{key:'mission'+i,gift:m.gift});
         if(m.gift&&m.gift.after){ await vnSay({who:(m.talk&&m.talk.length?m.talk[m.talk.length-1].who:sp.guide),t:m.gift.after}); await waitTap(); }
         MISSION.push(k); saveMission();
-        toast(sp.mission.every((_,j)=>MISSION.includes(sp.id+':'+j)) ? '미션 모두 완료! 곧 눈앞에 뾰로롱… ✨' : `미션 완료! ✅ ${label}`);
+        toast(sp.mission.every((_,j)=>MISSION.includes(sp.id+':'+j)) ? '미션 모두 완료! 이제 숨은 하트 봉투를 찾아봐 ✨' : `미션 완료! ✅ ${label}`);
         enterFree(); vnMenu();
       });
     });
