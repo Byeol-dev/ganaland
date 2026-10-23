@@ -453,7 +453,7 @@
   #toast.on{opacity:1;transform:translate(-50%,0)}
 
   /* ===================== 스팟 배경·NPC ===================== */
-  #vnBg.pic{width:390px;height:698px;background-size:390px 698px;background-repeat:no-repeat;transform:none}
+  #vnBg.pic{width:390px;height:100%;background-size:cover;background-position:center top;background-repeat:no-repeat;transform:none}
   #spotScr{background:#2a1c3e}
   #vnChars img.npc{height:250px}
   #vnChars img.npc.small{height:118px}
@@ -611,6 +611,8 @@
   #stage.short #vnChars img.solo{height:290px}
   #stage.short #vnChars img.l{height:240px} #stage.short #vnChars img.r{height:256px}
   #codeIn{font-size:17px}
+  #vnChars .ch{max-height:var(--chMax,999px);transition:filter .2s steps(2),transform .4s steps(4),opacity .4s steps(4),max-height .4s steps(4)}
+  #vnChars img.ch{width:auto}
 </style>
 </head>
 <body>
@@ -650,7 +652,7 @@
     <div>
       <h2>STAGE 1 · 온수리</h2>
       <div id="heroes"><div class="hero" id="heroM"></div><div class="hero" id="heroW"></div></div>
-      <p>보물 탐험대 출동!<br>하트 봉투를 모아 퍼즐 조각을 모아 줘</p>
+      <p>보물 탐험대 출동!<br>하트 봉투를 찾아 퍼즐 조각을 모아 줘</p>
       <button class="pbtn gold" id="goMap">지도 열기 ▶</button>
     </div>
   </div>
@@ -737,7 +739,7 @@
   </div>
 </div>
 
-<script src="data.js?v=mvlk4mx1"></script>
+<script src="data.js?v=mvlklhqd"></script>
 <script>
 /* ---------- 픽셀 스프라이트 ---------- */
 const PAL = {
@@ -802,7 +804,7 @@ function fit(){
   let s=W/390, sh=H/s;
   if(sh>844){ sh=844; s=Math.min(W/390,H/844); } else if(sh<640){ sh=640; s=H/640; }
   window._fitS=s;
-  window.SH=sh; stage.style.height=sh+'px'; stage.classList.toggle('short', sh<770); stage.classList.toggle('tiny', sh<700);
+  window.SH=sh; stage.style.height=sh+'px'; if(typeof syncChars==='function'&&document.getElementById('spotScr').classList.contains('on')) setTimeout(syncChars,50); stage.classList.toggle('short', sh<770); stage.classList.toggle('tiny', sh<700);
   stage.style.top=((vv?vv.offsetTop:0)+H/2)+'px';
   stage.style.transform=`translate(-50%,-50%) scale(${s})`;
 }
@@ -931,7 +933,7 @@ async function opening(){
   if(loadFound().length){   // 저장된 진행이 있으면 이어하기
     $('start').innerHTML=`이어하기 · ♥${loadFound().length}<span class="tri">▶</span>`;
     $('tap').innerHTML='<button id="restart" type="button">처음부터 다시 하기</button>'; $('tap').style.opacity=1;
-    $('restart').onclick=e=>{ e.stopPropagation(); if(confirm('모은 퍼즐 조각과 문장이 모두 지워져요. 처음부터 할까요?')){ try{ localStorage.removeItem(KEY); }catch(_){} location.reload(); } };
+    $('restart').onclick=e=>{ e.stopPropagation(); if(confirm('모은 퍼즐 조각·문장·레벨·미션 기록이 모두 지워져요. 처음부터 할까요?')){ try{ Object.keys(localStorage).filter(k=>k.startsWith('ganaland_')).forEach(k=>localStorage.removeItem(k)); }catch(_){} location.reload(); } };
   } else $('tap').classList.add('in');
 }
 if(!/q=/.test(location.hash)) opening();
@@ -944,7 +946,7 @@ stage.addEventListener('pointerdown',e=>{
 });
 
 /* ---------- 마스코트 반응 ---------- */
-const LINES=['간질간질~ 보물은 저쪽이야!','<b>강화 풍물시장</b> 근처가 수상해…','코인 모으면 좋은 일이 생길지도?','같이 가자! 준비됐지?'];
+const LINES=['간질간질~ 간지러워!','하트 봉투, 어디 숨었을까~?','친구들이 곳곳에서 기다리고 있어!','같이 가자! 준비됐지?'];
 let li=0, busy=false;
 $('mascots').addEventListener('pointerdown',async e=>{
   const m=$('mascots'); m.classList.remove('jump'); void m.offsetWidth; m.classList.add('jump');
@@ -1121,7 +1123,7 @@ $('btnPuzzle').onclick=()=>openPuzzle();
 function openPuzzle(){
   drawPuzzle($('pzBoard'),2,haveIdx());
   const n=haveIdx().length, done=n===TOTAL;
-  $('pzCnt').textContent= done ? '퍼즐 완성! ♥' : `퍼즐 조각 ${n}개를 모았어요`;
+  $('pzCnt').textContent= done ? '퍼즐 완성! ♥' : `퍼즐 조각 ${n}/${TOTAL}`;
   $('pzFoot').innerHTML = done ? '<button class="pbtn gold" id="pzFinal">마지막 선물 열기 🎁</button>' : '';
   if(done) $('pzFinal').onclick=openFinal;
   show('puzzleScr');
@@ -1260,11 +1262,14 @@ function speaker(who){
   document.querySelectorAll('#vnChars .ch').forEach(im=>{ const me=who==='both'||im.dataset.who===who; im.classList.toggle('dim',!me); im.classList.toggle('talk',me); });
 }
 const GUIDES=['purple','orange','both'];
-function syncChoices(){ $('spotScr').classList.toggle('nochoice', !$('vnChoices').children.length && !$('codeRow').classList.contains('on')); }
+function syncChoices(){ $('spotScr').classList.toggle('nochoice', !$('vnChoices').children.length && !$('codeRow').classList.contains('on')); if(typeof syncChars==='function') syncChars(); }
 new MutationObserver(syncChoices).observe(document.getElementById('vnChoices'),{childList:true});
 function syncChars(){
-  const S=$('spotScr'), free=S.classList.contains('free');
-  $('vnChars').style.bottom = free ? Math.max(120,$('vnChoices').offsetHeight+30)+'px' : '';
+  const S=$('spotScr'), free=S.classList.contains('free'), C=$('vnChars');
+  C.style.bottom = free ? Math.max(120,$('vnChoices').offsetHeight+30)+'px' : '';
+  // 캐릭터가 위쪽 이름 카드·✕ 버튼(약 110px)을 가리지 않게 — 이동이 끝난 뒤 위치 기준
+  const sh=window.SH||844, target= free ? Math.max(120,$('vnChoices').offsetHeight+30) : (S.classList.contains('nochoice') ? 200 : 362);
+  C.style.setProperty('--chMax', Math.max(120, sh-target-112)+'px');
 }
 function enterFree(){
   const S=$('spotScr'); S.classList.add('free');
@@ -1344,10 +1349,16 @@ function vnMenu(){
     if(sp.hintInTalk && sp.hintBy===n.key && !isFound(sp.id)){   // 이야기 끝에 이어서 힌트
       if(!sp.hintNoIntro){ await vnSay({who:n.key,t:'그리고… 힌트 하나 알려 줄게.'}); await waitTap(); }
       for(const h of [].concat(sp.hint||[])){ await vnSay(typeof h==='object'?h:{who:n.key,t:h}); await waitTap(); }
+      if(!MISSION.includes(sp.id+':hint')){ MISSION.push(sp.id+':hint'); saveMission(); }
     }
     if(n.gift && !hasGift(sp.id+':'+n.key)){ if(n.gift.pre){ await vnSay({who:n.key,t:n.gift.pre}); await waitTap(); } await giftScene(sp,n); await vnSay({who:n.key,t:n.gift.after||'기분 좋지? 이제 보물 찾으러 가 봐!'}); await waitTap(); }
     enterFree(); vnMenu();
   }));
+  if(sp.hintInTalk && MISSION.includes(sp.id+':hint')) btn('💡 힌트만 다시 듣기','',async()=>{   // 한 번 들은 뒤엔 힌트만 바로
+    C.innerHTML='';
+    for(const h of [].concat(sp.hint||[])){ await vnSay(typeof h==='object'?h:{who:sp.hintBy,t:h}); await waitTap(); }
+    enterFree(); vnMenu();
+  });
   const h= (sp.hintInTalk||sp.noHintButton) ? null : btn(vnHintSeen?'힌트 다시 듣기':'💡 힌트 보기','',async()=>{
     vnHintSeen=true; C.innerHTML='';
     const w= sp.hintBy || (sp.guide==='both' ? 'purple' : sp.guide);
@@ -1544,7 +1555,7 @@ async function claim(sp){
   $('gotSent').classList.add('pop'); beep([[988,.05],[1319,.08]]); burst(260,330,14,{speed:2.5,life:30}); await wait(400);
   await type($('paperTxt'), escapeHtml(sentOf(sp))+(sp.from?`<br><small class="from">— ${escapeHtml(sp.from)}</small>`:''), 40);
   const n=haveIdx().length;
-  $('foundCnt').textContent= `퍼즐 조각 ${n}개 모았어요` + (first?' · 저장됨 ✓':' · 이미 찾은 봉투예요');
+  $('foundCnt').textContent= `퍼즐 조각 ${n}/${TOTAL}` + (first?' · 저장됨 ✓':' · 이미 찾은 봉투예요');
   $('foundGo').textContent='책에 담기 ▶';
   foot.classList.add('in'); claiming=false;
 }
@@ -1562,7 +1573,7 @@ async function openBook(newSp){
   const add=(sp,isNew)=>{ const d=document.createElement('div'); d.className='bline'+(isNew?' new':''); d.innerHTML=`<i>${String(sp.no).padStart(2,'0')}</i><span>${escapeHtml(sentOf(sp))}${sp.from?`<small class="from">— ${escapeHtml(sp.from)}</small>`:''}</span>`; L.appendChild(d); return d; };
   got.filter(sp=>sp!==newSp).forEach(sp=>add(sp,false));
   const complete=haveIdx().length===TOTAL;
-  $('bookCnt').textContent=`퍼즐 조각 ${haveIdx().length}개`+(complete?' · 다 모았어!':'');
+  $('bookCnt').textContent=`퍼즐 조각 ${haveIdx().length}/${TOTAL}`+(complete?' · 다 모았어!':'');
   $('bookGo').textContent= complete ? '마지막 선물 열기 🎁' : '지도로 ▶';
   drawPuzzle($('miniPuzzle'),1,haveIdx(),{hide:newSp?[pieceIdx(newSp)]:[]});
   show('bookScr');
